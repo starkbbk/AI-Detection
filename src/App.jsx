@@ -41,18 +41,30 @@ const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000)
 };
 
 const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
-  // Robust model ID extraction
-  const cleanModel = model.split('/').pop().trim();
+  const cleanModel = model.split('/').pop().trim() || 'gemini-1.5-flash';
   
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`, {
+  const attemptCall = async (modelId) => {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
     });
-    const data = await response.json();
-    if (data.error) throw new Error(`[${cleanModel}] ${data.error.message}`);
-    if (!data.candidates || !data.candidates[0]) throw new Error(`[${cleanModel}] No response from AI core.`);
+    return await response.json();
+  };
+
+  try {
+    let data = await attemptCall(cleanModel);
+    
+    // Fallback logic: If Flash fails, try Pro
+    if (data.error && (data.error.message.includes('not found') || data.error.message.includes('not supported'))) {
+      data = await attemptCall('gemini-pro');
+    }
+
+    if (data.error) {
+      throw new Error(`[${cleanModel}] ${data.error.message}. TIP: Ensure 'Generative Language API' is enabled in Google AI Studio.`);
+    }
+    
+    if (!data.candidates || !data.candidates[0]) throw new Error("No response from Gemini.");
     return data.candidates[0].content.parts[0].text;
   } catch (err) {
     throw new Error(`Gemini Core Error: ${err.message}`);
