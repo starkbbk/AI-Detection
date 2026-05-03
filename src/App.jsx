@@ -306,9 +306,9 @@ Return ONLY the JSON. No markdown. No explanation.`;
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl orbitron text-[#00ff88]">AI Content Detection</h2>
-      <div className="glass p-6 rounded-lg flex flex-col gap-4 scan-container">
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto h-full overflow-hidden">
+      <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">AI Content Detection</h2>
+      <div className={`glass p-4 md:p-6 rounded-lg flex flex-col gap-4 scan-container ${result ? 'h-48' : 'flex-1'}`}>
         {loading && <div className="scan-line"></div>}
         <div className="flex justify-between items-center">
           <label className="cursor-pointer bg-[#222] hover:bg-[#333] px-4 py-2 rounded flex items-center gap-2 border border-[#444] transition">
@@ -320,42 +320,42 @@ Return ONLY the JSON. No markdown. No explanation.`;
         <textarea 
           value={text} onChange={e => setText(e.target.value)}
           placeholder="Paste your text here..."
-          className="w-full h-64 bg-[#111] border border-[#333] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white"
+          className="w-full flex-1 bg-[#111] border border-[#333] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white min-h-0"
         ></textarea>
-        {error && <div className="text-[#ff3366]">{error}</div>}
-        <button onClick={handleScan} disabled={loading} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50">
+        {error && <div className="text-[#ff3366] text-sm">{error}</div>}
+        <button onClick={handleScan} disabled={loading} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50 shrink-0">
           {loading ? <span className="typewriter">🔍 Analyzing patterns...</span> : 'Analyze Content'}
         </button>
       </div>
 
       {result && (
-        <div className="animated-border p-[1px] mt-4">
-          <div className="glass p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="col-span-1 flex flex-col items-center justify-center gap-4 border-r border-[#333] pr-6">
+        <div className="animated-border p-[1px] mt-2 flex-1 min-h-0">
+          <div className="glass p-4 md:p-6 rounded-lg grid grid-cols-1 md:grid-cols-3 gap-6 h-full overflow-y-auto">
+            <div className="col-span-1 flex flex-col items-center justify-center gap-4 md:border-r border-[#333] md:pr-6">
               <CircularGauge percentage={result.ai_percentage} />
               <div className={`px-4 py-1 rounded text-sm font-bold ${result.ai_percentage > 70 ? 'bg-[#ff3366]/20 text-[#ff3366]' : result.ai_percentage > 40 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-[#00ff88]/20 text-[#00ff88]'}`}>
                 {result.verdict}
               </div>
               <div className="text-sm text-gray-400">Confidence: <span className="text-white">{result.confidence}</span></div>
               {onHumanizeRequest && (
-                <button onClick={() => onHumanizeRequest(text)} className="mt-4 flex items-center gap-2 border border-[#00ff88] text-[#00ff88] px-4 py-2 rounded hover:bg-[#00ff88]/10 transition">
-                  <Wand2 size={18} /> Humanize Text
+                <button onClick={() => onHumanizeRequest(text)} className="mt-2 flex items-center gap-2 border border-[#00ff88] text-[#00ff88] px-4 py-2 rounded hover:bg-[#00ff88]/10 transition text-sm">
+                  <Wand2 size={16} /> Humanize Text
                 </button>
               )}
             </div>
-            <div className="col-span-2 flex flex-col gap-4">
+            <div className="col-span-2 flex flex-col gap-4 min-h-0 overflow-y-auto">
               <div>
-                <h3 className="orbitron text-lg mb-2 text-gray-300">Suspicious Patterns</h3>
+                <h3 className="orbitron text-base mb-1 text-gray-300">Suspicious Patterns</h3>
                 <ul className="list-disc pl-5 text-sm text-[#ff3366]">
                   {result.suspicious_patterns?.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
               </div>
               <div>
-                <h3 className="orbitron text-lg mb-2 text-gray-300">Writing Style Notes</h3>
+                <h3 className="orbitron text-base mb-1 text-gray-300">Writing Style Notes</h3>
                 <p className="text-sm text-gray-400">{result.writing_style_notes}</p>
               </div>
               <div>
-                <h3 className="orbitron text-lg mb-2 text-gray-300">Sentence Analysis</h3>
+                <h3 className="orbitron text-base mb-1 text-gray-300">Sentence Analysis</h3>
                 <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-2">
                   {result.sentence_analysis?.map((s, i) => (
                     <div key={i} className="bg-[#111] p-2 rounded flex justify-between text-xs items-center border border-[#222]">
@@ -433,42 +433,46 @@ Rules:
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto h-full">
-      <h2 className="text-2xl orbitron text-[#00ff88]">Text Humanizer</h2>
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[400px]">
-        <div className="glass p-4 rounded-lg flex flex-col gap-2 scan-container">
-          <div className="flex justify-between items-center mb-2">
-            <span className="orbitron text-gray-300">Original Text</span>
-            <span className="text-xs text-gray-500">Words: {getWordCount(text)}</span>
+    <div className="flex flex-col gap-4 max-w-6xl mx-auto h-full overflow-hidden">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">Text Humanizer</h2>
+        <div className="text-[10px] courier text-gray-500 uppercase">Limit: {currentUser.access === 'full' ? '10k' : '1k'} words</div>
+      </div>
+      
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+        <div className="glass p-4 rounded-lg flex flex-col gap-2 scan-container min-h-0">
+          <div className="flex justify-between items-center mb-1">
+            <span className="orbitron text-xs text-gray-300 uppercase tracking-widest">Input Stream</span>
+            <span className="text-[10px] text-gray-500 courier">Words: {getWordCount(text)}</span>
           </div>
           <textarea 
             value={text} onChange={e => setText(e.target.value)}
             placeholder="Paste AI-generated text here..."
-            className="flex-1 bg-[#111] border border-[#333] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white"
+            className="flex-1 bg-[#111] border border-[#333] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white text-sm min-h-0 courier"
           ></textarea>
-          <button onClick={handleHumanize} disabled={loading} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50 mt-2">
-            {loading ? <span className="typewriter">✨ Humanizing text...</span> : 'Humanize Text'}
+          <button onClick={handleHumanize} disabled={loading} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50 mt-1 shrink-0 orbitron uppercase text-xs tracking-wider">
+            {loading ? <span className="typewriter">✨ RECODING TEXT...</span> : 'HUMANIZE'}
           </button>
-          {error && <div className="text-[#ff3366] text-sm mt-2">{error}</div>}
+          {error && <div className="text-[#ff3366] text-[10px] mt-1 courier uppercase">{'>'} ERROR: {error}</div>}
         </div>
 
-        <div className="animated-border p-[1px] h-full flex flex-col">
-          <div className="glass p-4 rounded-lg flex flex-col gap-2 h-full">
-            <div className="flex justify-between items-center mb-2">
-              <span className="orbitron text-[#00ff88]">Humanized Output</span>
-              {result && <span className="text-xs text-gray-500">Words: {getWordCount(result)}</span>}
+        <div className="animated-border p-[1px] flex flex-col min-h-0">
+          <div className="glass p-4 rounded-lg flex flex-col gap-2 h-full min-h-0">
+            <div className="flex justify-between items-center mb-1">
+              <span className="orbitron text-xs text-[#00ff88] uppercase tracking-widest">Humanized Output</span>
+              {result && <span className="text-[10px] text-gray-500 courier">Words: {getWordCount(result)}</span>}
             </div>
-            <div className="flex-1 bg-[#0a0a0f] border border-[#222] rounded p-4 overflow-y-auto whitespace-pre-wrap text-gray-200">
-              {result ? result : <span className="text-gray-600 italic">Result will appear here...</span>}
+            <div className="flex-1 bg-[#0a0a0f] border border-[#222] rounded p-4 overflow-y-auto whitespace-pre-wrap text-gray-200 text-sm min-h-0 courier">
+              {result ? result : <span className="text-gray-700 italic">SYSTEM READY... AWAITING INPUT...</span>}
             </div>
             {result && (
-              <div className="flex gap-2 mt-2">
-                <button onClick={copyToClipboard} className="flex-1 flex items-center justify-center gap-2 border border-[#333] hover:border-[#00ff88] text-gray-300 py-2 rounded transition">
-                  {copied ? <><Check size={18} /> Copied!</> : <><Copy size={18} /> Copy Text</>}
+              <div className="flex gap-2 mt-1 shrink-0">
+                <button onClick={copyToClipboard} className="flex-1 flex items-center justify-center gap-2 border border-[#333] hover:border-[#00ff88] text-gray-300 py-2 rounded transition text-[10px] uppercase orbitron tracking-wider">
+                  {copied ? <><Check size={14} /> COPIED!</> : <><Copy size={14} /> COPY</>}
                 </button>
                 {onDetectRequest && (
-                  <button onClick={() => onDetectRequest(result)} className="flex-1 flex items-center justify-center gap-2 border border-[#00ff88] text-[#00ff88] hover:bg-[#00ff88]/10 py-2 rounded transition">
-                    <Shield size={18} /> Re-scan for AI
+                  <button onClick={() => onDetectRequest(result)} className="flex-1 flex items-center justify-center gap-2 border border-[#00ff88] text-[#00ff88] py-2 rounded hover:bg-[#00ff88]/10 transition text-[10px] uppercase orbitron tracking-wider">
+                    <Shield size={14} /> RE-SCAN
                   </button>
                 )}
               </div>
@@ -502,8 +506,8 @@ const HistoryPage = ({ currentUser }) => {
   }, [currentUser]);
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl orbitron text-[#00ff88]">Scan History</h2>
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+      <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">Scan History</h2>
       <div className="glass rounded-lg overflow-hidden border border-[#333]">
         <table className="w-full text-left text-sm">
           <thead className="bg-[#111] text-gray-400 border-b border-[#333]">
@@ -607,78 +611,80 @@ const AdminPage = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto p-2 md:p-0">
-      <div className="flex justify-between items-center px-2 md:px-0">
-        <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">System Administration</h2>
-        <div className="text-[10px] courier text-gray-500 uppercase">Total: {users.length}</div>
+    <div className="flex flex-col gap-4 max-w-6xl mx-auto h-full overflow-hidden">
+      <div className="flex justify-between items-center px-1">
+        <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">System Registry</h2>
+        <div className="text-[10px] courier text-gray-500 uppercase tracking-widest">Active nodes: {users.length}</div>
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden md:block glass rounded-lg overflow-hidden border border-[#333]">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[#111] text-gray-400 border-b border-[#333]">
-            <tr>
-              <th className="p-4">User Identity</th>
-              <th className="p-4">Role</th>
-              <th className="p-4">Status</th>
-              <th className="p-4">Tier</th>
-              <th className="p-4">Usage</th>
-              <th className="p-4 text-right">Control</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.filter(u => u).map((u, i) => (
-              <tr key={i} className="border-b border-[#222] hover:bg-[#111] transition text-xs">
-                <td className="p-4 text-gray-300 font-mono">{u.email}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
-                </td>
-                <td className="p-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900/40 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
-                </td>
-                <td className="p-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-500'}`}>{u.access || 'limited'}</span>
-                </td>
-                <td className="p-4 text-gray-300">{u.wordsScanned || 0} w</td>
-                <td className="p-4 text-right flex justify-end gap-1">
-                  {u.status === 'pending' && (
-                    <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-[9px] px-2 py-1 rounded uppercase">Approve</button>
-                  )}
-                  <button onClick={()=>toggleBlock(u.email, u.status)} className={`text-[9px] px-2 py-1 rounded border border-[#333] uppercase ${u.status==='blocked' ? 'bg-red-600 text-white border-none' : 'hover:bg-[#333]'}`}>{u.status === 'blocked' ? 'Unblock' : 'Block'}</button>
-                  <button onClick={()=>toggleAccess(u.email, u.access)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-blue-400 uppercase">Tier</button>
-                  <button onClick={()=>toggleRole(u.email, u.role)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-[#00ff88] uppercase">Role</button>
-                </td>
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+        {/* Desktop Table */}
+        <div className="hidden md:block glass rounded-lg overflow-hidden border border-[#333]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[#111] text-gray-500 border-b border-[#333] orbitron text-[10px] uppercase tracking-widest">
+              <tr>
+                <th className="p-4">Identity</th>
+                <th className="p-4">Role</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Tier</th>
+                <th className="p-4">Usage</th>
+                <th className="p-4 text-right">Access Control</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {users.filter(u => u).map((u, i) => (
+                <tr key={i} className="border-b border-[#222] hover:bg-[#111] transition text-xs">
+                  <td className="p-4 text-gray-300 font-mono">{u.email}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase courier ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase courier ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900/40 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase courier ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-500'}`}>{u.access || 'limited'}</span>
+                  </td>
+                  <td className="p-4 text-gray-400 courier">{u.wordsScanned || 0} w</td>
+                  <td className="p-4 text-right flex justify-end gap-1">
+                    {u.status === 'pending' && (
+                      <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-[9px] px-2 py-1 rounded uppercase orbitron">Link</button>
+                    )}
+                    <button onClick={()=>toggleBlock(u.email, u.status)} className={`text-[9px] px-2 py-1 rounded border border-[#333] uppercase orbitron ${u.status==='blocked' ? 'bg-red-600 text-white border-none' : 'hover:bg-[#333]'}`}>{u.status === 'blocked' ? 'Unlock' : 'Lock'}</button>
+                    <button onClick={()=>toggleAccess(u.email, u.access)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-blue-400 uppercase orbitron">Tier</button>
+                    <button onClick={()=>toggleRole(u.email, u.role)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-[#00ff88] uppercase orbitron">Priv</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Mobile Card List */}
-      <div className="md:hidden flex flex-col gap-4">
-        {users.filter(u => u).map((u, i) => (
-          <div key={i} className="glass p-4 rounded-lg border border-[#333] flex flex-col gap-3">
-            <div className="flex justify-between items-start">
-              <div className="flex flex-col gap-1 overflow-hidden">
-                <span className="text-xs font-mono text-gray-300 truncate">{u.email}</span>
-                <div className="flex gap-2">
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-400'}`}>{u.access || 'limited'}</span>
+        {/* Mobile Card List */}
+        <div className="md:hidden flex flex-col gap-3">
+          {users.filter(u => u).map((u, i) => (
+            <div key={i} className="glass p-4 rounded-lg border border-[#333] flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-1 overflow-hidden">
+                  <span className="text-xs font-mono text-gray-300 truncate">{u.email}</span>
+                  <div className="flex gap-2">
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase courier ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase courier ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-400'}`}>{u.access || 'limited'}</span>
+                  </div>
                 </div>
+                <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase courier ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900 text-white' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
               </div>
-              <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900 text-white' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+              <div className="text-[10px] text-gray-500 courier tracking-tight">DATA_USAGE: {u.wordsScanned || 0} WORDS</div>
+              <div className="flex gap-2 pt-2 border-t border-[#222]">
+                {u.status === 'pending' && (
+                  <button onClick={()=>approveUser(u.email)} className="flex-1 bg-[#00ff88]/20 text-[#00ff88] py-2 rounded text-[9px] uppercase font-bold orbitron">Link</button>
+                )}
+                <button onClick={()=>toggleBlock(u.email, u.status)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase orbitron hover:bg-red-900">{u.status === 'blocked' ? 'Unlock' : 'Lock'}</button>
+                <button onClick={()=>toggleAccess(u.email, u.access)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase orbitron">Tier</button>
+                <button onClick={()=>toggleRole(u.email, u.role)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase orbitron">Priv</button>
+              </div>
             </div>
-            <div className="text-[10px] text-gray-500 courier">Usage: {u.wordsScanned || 0} words</div>
-            <div className="flex gap-2 pt-2 border-t border-[#222]">
-              {u.status === 'pending' && (
-                <button onClick={()=>approveUser(u.email)} className="flex-1 bg-[#00ff88]/20 text-[#00ff88] py-2 rounded text-[9px] uppercase font-bold">Approve</button>
-              )}
-              <button onClick={()=>toggleBlock(u.email, u.status)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase hover:bg-red-900">{u.status === 'blocked' ? 'Unblock' : 'Block'}</button>
-              <button onClick={()=>toggleAccess(u.email, u.access)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase">Tier</button>
-              <button onClick={()=>toggleRole(u.email, u.role)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase">Role</button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -705,15 +711,15 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl orbitron text-[#00ff88]">Settings</h2>
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto pb-10">
+      <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">System Settings</h2>
       
-      <div className="glass p-6 rounded-lg flex flex-col gap-4">
-        <h3 className="orbitron text-[#00ff88] border-b border-[#333] pb-2">AI Provider Selection</h3>
+      <div className="glass p-4 md:p-6 rounded-lg flex flex-col gap-4 border border-[#333]">
+        <h3 className="orbitron text-xs text-[#00ff88] border-b border-[#333] pb-2 uppercase tracking-widest">AI Core Configuration</h3>
         <select 
           value={config.provider} 
           onChange={e => setConfig({...config, provider: e.target.value})}
-          className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
+          className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white text-sm"
         >
           <option value="groq">Groq (Llama Models - Fast)</option>
           <option value="gemini">Google Gemini (Best for Large Texts)</option>
@@ -721,57 +727,57 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
         </select>
         
         <div>
-          <label className="block text-gray-400 mb-1 text-sm">Active Model ID</label>
+          <label className="block text-gray-500 mb-1 text-[10px] uppercase courier">Active Model ID</label>
           <input 
             type="text" 
             value={config.model} 
             onChange={e => setConfig({...config, model: e.target.value})}
-            className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-            placeholder="e.g. gemini-1.5-flash or llama-3.3-70b-versatile"
+            className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white text-sm"
+            placeholder="e.g. gemini-1.5-flash"
           />
         </div>
 
         {isAdmin ? (
-          <div className="mt-4 flex flex-col gap-6">
+          <div className="mt-2 flex flex-col gap-4">
             {/* Groq */}
             <div className={`p-4 border rounded ${config.provider === 'groq' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-              <label className="block text-sm text-gray-400 mb-2">Groq API Key</label>
+              <label className="block text-[10px] text-gray-500 mb-2 uppercase courier">Groq API Key</label>
               <div className="flex gap-2">
                 <input type={showGroq ? "text" : "password"} value={config.groqKey} onChange={e => setConfig({...config, groqKey: e.target.value})}
-                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-                <button onClick={() => setShowGroq(!showGroq)} className="px-2">👁</button>
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white text-sm" />
+                <button onClick={() => setShowGroq(!showGroq)} className="px-2 text-xs">👁</button>
               </div>
             </div>
 
             {/* Gemini */}
             <div className={`p-4 border rounded ${config.provider === 'gemini' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-              <label className="block text-sm text-gray-400 mb-2">Gemini API Key</label>
+              <label className="block text-[10px] text-gray-500 mb-2 uppercase courier">Gemini API Key</label>
               <div className="flex gap-2">
                 <input type={showGemini ? "text" : "password"} value={config.geminiKey} onChange={e => setConfig({...config, geminiKey: e.target.value})}
-                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-                <button onClick={() => setShowGemini(!showGemini)} className="px-2">👁</button>
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white text-sm" />
+                <button onClick={() => setShowGemini(!showGemini)} className="px-2 text-xs">👁</button>
               </div>
             </div>
 
             {/* Router */}
             <div className={`p-4 border rounded ${config.provider === 'router' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-              <label className="block text-sm text-gray-400 mb-1">Router Base URL</label>
+              <label className="block text-[10px] text-gray-500 mb-1 uppercase courier">Router Base URL</label>
               <input type="text" value={config.routerBase} onChange={e => setConfig({...config, routerBase: e.target.value})}
-                className="w-full bg-[#0a0a0f] border border-[#333] p-2 rounded text-white mb-3" placeholder="https://agentrouter.org/v1" />
-              <label className="block text-sm text-gray-400 mb-1">Router API Key</label>
+                className="w-full bg-[#0a0a0f] border border-[#333] p-2 rounded text-white mb-3 text-sm" placeholder="https://agentrouter.org/v1" />
+              <label className="block text-[10px] text-gray-500 mb-1 uppercase courier">Router API Key</label>
               <div className="flex gap-2">
                 <input type={showRouter ? "text" : "password"} value={config.routerKey} onChange={e => setConfig({...config, routerKey: e.target.value})}
-                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-                <button onClick={() => setShowRouter(!showRouter)} className="px-2">👁</button>
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white text-sm" />
+                <button onClick={() => setShowRouter(!showRouter)} className="px-2 text-xs">👁</button>
               </div>
             </div>
             
-            <button onClick={saveGlobal} className="mt-4 bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-3 rounded hover:bg-[#ff3366] hover:text-white transition">
-              {saved ? 'Saved Successfully!' : 'Save as Default for All Users'}
+            <button onClick={saveGlobal} className="mt-2 bg-[#ff3366]/10 text-[#ff3366] border border-[#ff3366]/30 py-3 rounded hover:bg-[#ff3366] hover:text-white transition orbitron text-xs tracking-widest uppercase">
+              {saved ? 'SUCCESSFULLY SAVED' : 'COMMIT GLOBAL CONFIG'}
             </button>
           </div>
         ) : (
-          <div className="p-8 border border-[#333] rounded bg-black/40 text-center courier text-xs text-gray-500">
+          <div className="p-8 border border-[#333] rounded bg-black/40 text-center courier text-[10px] text-gray-500 uppercase">
             {'>'} SYSTEM: API_ACCESS_RESTRICTED<br/>
             {'>'} STATUS: MANAGED_BY_ADMINISTRATOR<br/>
             {'>'} CONTACT ADMIN FOR KEY UPDATES
@@ -780,29 +786,29 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
       </div>
 
         <div className="mt-6 pt-6 border-t border-[#333]">
-          <h3 className="text-xl orbitron text-[#00ff88] mb-4">Change Password</h3>
+          <h3 className="text-xs orbitron text-[#00ff88] mb-4 uppercase tracking-widest">Security Credentials</h3>
           <div className="flex flex-col gap-4">
-            {pwError && <div className="text-[#ff3366] text-sm">{pwError}</div>}
-            {pwSuccess && <div className="text-[#00ff88] text-sm">{pwSuccess}</div>}
-            <input type="password" placeholder="Old Password" value={oldPassword} onChange={e => setOldPassword(e.target.value)}
-              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+            {pwError && <div className="text-[#ff3366] text-xs courier">{'>'} {pwError}</div>}
+            {pwSuccess && <div className="text-[#00ff88] text-xs courier">{'>'} {pwSuccess}</div>}
+            <input type="password" placeholder="Current Password" value={oldPassword} onChange={e => setOldPassword(e.target.value)}
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white text-sm" />
             <input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white text-sm" />
             <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white text-sm" />
             <button onClick={async () => {
               setPwError(''); setPwSuccess('');
-              if (oldPassword !== currentUser.password) return setPwError("Incorrect old password.");
-              if (newPassword !== confirmPassword) return setPwError("Passwords do not match.");
-              if (newPassword.length < 6) return setPwError("New password must be at least 6 characters.");
+              if (oldPassword !== currentUser.password) return setPwError("AUTH_VERIFICATION_FAILED");
+              if (newPassword !== confirmPassword) return setPwError("MISMATCHED_INPUT");
+              if (newPassword.length < 6) return setPwError("KEY_STRENGTH_INSUFFICIENT");
               
               const updatedUser = { ...currentUser, password: newPassword };
               await window.storage.set(`users:${currentUser.email}`, updatedUser);
               setCurrentUser(updatedUser);
-              setPwSuccess("Password updated successfully!");
+              setPwSuccess("CREDENTIALS_RECODED_SUCCESSFULLY");
               setOldPassword(''); setNewPassword(''); setConfirmPassword('');
-            }} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition">
-              Update Password
+            }} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition orbitron text-xs tracking-widest">
+              UPDATE ACCESS KEY
             </button>
         </div>
       </div>
@@ -947,7 +953,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="p-4 md:p-8 flex-1 w-full max-w-full overflow-x-hidden">
+        <div className="p-4 md:p-6 flex-1 w-full max-w-full overflow-x-hidden">
           {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
             <div className="bg-[#ff3366]/10 border border-[#ff3366]/30 text-[#ff3366] p-4 rounded mb-6 flex justify-between items-center courier text-xs animate-pulse">
               <span>{'>'} WARNING: NO_API_KEYS_DETECTED</span>
