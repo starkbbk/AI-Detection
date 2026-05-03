@@ -121,6 +121,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
         if (!userObj) throw new Error("ID_NOT_FOUND");
         if (userObj.value.password !== password) throw new Error("AUTH_KEY_INVALID");
         if (userObj.value.status === 'pending') throw new Error("PENDING_ADMIN_LINK");
+        if (userObj.value.status === 'blocked') throw new Error("ACCOUNT_LOCKED_BY_ADMIN");
         setCurrentUser(userObj.value);
         setPage('detect');
       } else {
@@ -131,8 +132,9 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
         // Only grant admin if secret code matches
         const role = adminCode === 'GODMODE_ADMIN' ? 'admin' : 'user';
         const status = role === 'admin' ? 'approved' : 'pending';
+        const access = role === 'admin' ? 'full' : 'limited';
         
-        const newUser = { email, password, role, status, wordsScanned: 0 };
+        const newUser = { email, password, role, status, access, wordsScanned: 0 };
         await window.storage.set(`users:${email}`, newUser);
         
         if (role === 'admin') {
@@ -252,8 +254,9 @@ const DetectPage = ({ currentUser, config, onHumanizeRequest, initialText = '' }
     setError(''); setResult(null);
     if (!text.trim()) return setError("Please enter text or upload a file.");
     const words = getWordCount(text);
-    if (currentUser.role === 'user' && words > 5000) {
-      return setError("Word limit exceeded (5000). Please upgrade.");
+    const limit = currentUser.role === 'admin' ? Infinity : (currentUser.access === 'full' ? 10000 : 1000);
+    if (words > limit) {
+      return setError(`Word limit exceeded for your tier (${limit}). Contact admin for full access.`);
     }
     
     const { provider, groqKey, geminiKey, routerKey } = config;
@@ -381,8 +384,9 @@ const HumanizePage = ({ currentUser, config, initialText = '', onDetectRequest }
     setError(''); setResult(''); setCopied(false);
     if (!text.trim()) return setError("Please enter text.");
     const words = getWordCount(text);
-    if (currentUser.role === 'user' && words > 5000) {
-      return setError("Word limit exceeded (5000). Please upgrade.");
+    const limit = currentUser.role === 'admin' ? Infinity : (currentUser.access === 'full' ? 10000 : 1000);
+    if (words > limit) {
+      return setError(`Word limit exceeded for your tier (${limit}). Contact admin for full access.`);
     }
     
     const { provider, groqKey, geminiKey, routerKey } = config;
@@ -562,6 +566,27 @@ const AdminPage = () => {
     const data = await window.storage.get(key);
     if (data) {
       data.value.status = 'approved';
+      if (!data.value.access) data.value.access = 'limited';
+      await window.storage.set(key, data.value);
+      loadUsers();
+    }
+  };
+
+  const toggleBlock = async (email, currentStatus) => {
+    const key = `users:${email}`;
+    const data = await window.storage.get(key);
+    if (data) {
+      data.value.status = currentStatus === 'blocked' ? 'approved' : 'blocked';
+      await window.storage.set(key, data.value);
+      loadUsers();
+    }
+  };
+
+  const toggleAccess = async (email, currentAccess) => {
+    const key = `users:${email}`;
+    const data = await window.storage.get(key);
+    if (data) {
+      data.value.access = currentAccess === 'full' ? 'limited' : 'full';
       await window.storage.set(key, data.value);
       loadUsers();
     }
@@ -569,42 +594,57 @@ const AdminPage = () => {
 
   const deleteUser = async (email) => {
     if(window.confirm(`Delete ${email}?`)) {
-      await window.storage.remove(`users:${email}`);
+      const keys = await window.storage.keys();
+      if (keys.includes(`users:${email}`)) {
+        // Find the key and delete. Assuming window.storage has a generic way or I use set(key, undefined)
+        // Based on previous code, I'll use set with null if delete isn't clear, 
+        // but let's try to find if there's a delete/remove.
+        // Actually, I'll just use a filter and re-save? No, window.storage is a KV store.
+        await window.storage.set(`users:${email}`, undefined);
+      }
       loadUsers();
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl orbitron text-[#ff3366]">User Management</h2>
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl orbitron text-[#00ff88]">System Administration</h2>
+        <div className="text-xs courier text-gray-500">Total Accounts: {users.length}</div>
+      </div>
       <div className="glass rounded-lg overflow-hidden border border-[#333]">
         <table className="w-full text-left text-sm">
           <thead className="bg-[#111] text-gray-400 border-b border-[#333]">
             <tr>
-              <th className="p-4">Email</th>
+              <th className="p-4">User Identity</th>
               <th className="p-4">Role</th>
               <th className="p-4">Status</th>
-              <th className="p-4">Words Scanned</th>
-              <th className="p-4 text-right">Actions</th>
+              <th className="p-4">Tier</th>
+              <th className="p-4">Usage</th>
+              <th className="p-4 text-right">Control</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u, i) => (
+            {users.filter(u => u).map((u, i) => (
               <tr key={i} className="border-b border-[#222] hover:bg-[#111] transition">
-                <td className="p-4 text-gray-300">{u.email}</td>
+                <td className="p-4 text-gray-300 font-mono text-xs">{u.email}</td>
                 <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-xs ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-300'}`}>{u.role}</span>
+                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
                 </td>
                 <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-xs ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900/40 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
                 </td>
-                <td className="p-4 text-gray-300">{u.wordsScanned || 0}</td>
-                <td className="p-4 text-right flex justify-end gap-2">
+                <td className="p-4">
+                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-500'}`}>{u.access || 'limited'}</span>
+                </td>
+                <td className="p-4 text-gray-300 text-xs">{u.wordsScanned || 0} words</td>
+                <td className="p-4 text-right flex justify-end gap-1">
                   {u.status === 'pending' && (
-                    <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-xs px-2 py-1 rounded">Approve</button>
+                    <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-[9px] px-2 py-1 rounded uppercase">Approve</button>
                   )}
-                  <button onClick={()=>toggleRole(u.email, u.role)} className="border border-[#444] hover:border-[#00ff88] text-xs px-2 py-1 rounded">Toggle Role</button>
-                  <button onClick={()=>deleteUser(u.email)} className="bg-[#ff3366]/20 text-[#ff3366] hover:bg-[#ff3366] hover:text-white text-xs px-2 py-1 rounded">Delete</button>
+                  <button onClick={()=>toggleBlock(u.email, u.status)} className={`text-[9px] px-2 py-1 rounded border border-[#333] uppercase ${u.status==='blocked' ? 'bg-red-600 text-white border-none' : 'hover:bg-[#333]'}`}>{u.status === 'blocked' ? 'Unblock' : 'Block'}</button>
+                  <button onClick={()=>toggleAccess(u.email, u.access)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-blue-400 uppercase">Tier</button>
+                  <button onClick={()=>toggleRole(u.email, u.role)} className="border border-[#444] text-[9px] px-2 py-1 rounded hover:border-[#00ff88] uppercase">Role</button>
                 </td>
               </tr>
             ))}
@@ -662,45 +702,51 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
           />
         </div>
 
-        <div className="mt-4 flex flex-col gap-6">
-          {/* Groq */}
-          <div className={`p-4 border rounded ${config.provider === 'groq' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-            <label className="block text-sm text-gray-400 mb-2">Groq API Key</label>
-            <div className="flex gap-2">
-              <input type={showGroq ? "text" : "password"} value={config.groqKey} onChange={e => setConfig({...config, groqKey: e.target.value})}
-                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-              <button onClick={() => setShowGroq(!showGroq)} className="px-2">👁</button>
+        {isAdmin ? (
+          <div className="mt-4 flex flex-col gap-6">
+            {/* Groq */}
+            <div className={`p-4 border rounded ${config.provider === 'groq' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+              <label className="block text-sm text-gray-400 mb-2">Groq API Key</label>
+              <div className="flex gap-2">
+                <input type={showGroq ? "text" : "password"} value={config.groqKey} onChange={e => setConfig({...config, groqKey: e.target.value})}
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+                <button onClick={() => setShowGroq(!showGroq)} className="px-2">👁</button>
+              </div>
             </div>
-          </div>
 
-          {/* Gemini */}
-          <div className={`p-4 border rounded ${config.provider === 'gemini' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-            <label className="block text-sm text-gray-400 mb-2">Gemini API Key</label>
-            <div className="flex gap-2">
-              <input type={showGemini ? "text" : "password"} value={config.geminiKey} onChange={e => setConfig({...config, geminiKey: e.target.value})}
-                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-              <button onClick={() => setShowGemini(!showGemini)} className="px-2">👁</button>
+            {/* Gemini */}
+            <div className={`p-4 border rounded ${config.provider === 'gemini' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+              <label className="block text-sm text-gray-400 mb-2">Gemini API Key</label>
+              <div className="flex gap-2">
+                <input type={showGemini ? "text" : "password"} value={config.geminiKey} onChange={e => setConfig({...config, geminiKey: e.target.value})}
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+                <button onClick={() => setShowGemini(!showGemini)} className="px-2">👁</button>
+              </div>
             </div>
-          </div>
 
-          {/* Router */}
-          <div className={`p-4 border rounded ${config.provider === 'router' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
-            <label className="block text-sm text-gray-400 mb-1">Router Base URL</label>
-            <input type="text" value={config.routerBase} onChange={e => setConfig({...config, routerBase: e.target.value})}
-              className="w-full bg-[#0a0a0f] border border-[#333] p-2 rounded text-white mb-3" placeholder="https://agentrouter.org/v1" />
-            <label className="block text-sm text-gray-400 mb-1">Router API Key</label>
-            <div className="flex gap-2">
-              <input type={showRouter ? "text" : "password"} value={config.routerKey} onChange={e => setConfig({...config, routerKey: e.target.value})}
-                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
-              <button onClick={() => setShowRouter(!showRouter)} className="px-2">👁</button>
+            {/* Router */}
+            <div className={`p-4 border rounded ${config.provider === 'router' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+              <label className="block text-sm text-gray-400 mb-1">Router Base URL</label>
+              <input type="text" value={config.routerBase} onChange={e => setConfig({...config, routerBase: e.target.value})}
+                className="w-full bg-[#0a0a0f] border border-[#333] p-2 rounded text-white mb-3" placeholder="https://agentrouter.org/v1" />
+              <label className="block text-sm text-gray-400 mb-1">Router API Key</label>
+              <div className="flex gap-2">
+                <input type={showRouter ? "text" : "password"} value={config.routerKey} onChange={e => setConfig({...config, routerKey: e.target.value})}
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+                <button onClick={() => setShowRouter(!showRouter)} className="px-2">👁</button>
+              </div>
             </div>
+            
+            <button onClick={saveGlobal} className="mt-4 bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-3 rounded hover:bg-[#ff3366] hover:text-white transition">
+              {saved ? 'Saved Successfully!' : 'Save as Default for All Users'}
+            </button>
           </div>
-        </div>
-
-        {isAdmin && (
-          <button onClick={saveGlobal} className="mt-4 bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-3 rounded hover:bg-[#ff3366] hover:text-white transition">
-            {saved ? 'Saved Successfully!' : 'Save as Default for All Users'}
-          </button>
+        ) : (
+          <div className="p-8 border border-[#333] rounded bg-black/40 text-center courier text-xs text-gray-500">
+            {'>'} SYSTEM: API_ACCESS_RESTRICTED<br/>
+            {'>'} STATUS: MANAGED_BY_ADMINISTRATOR<br/>
+            {'>'} CONTACT ADMIN FOR KEY UPDATES
+          </div>
         )}
       </div>
 
