@@ -71,6 +71,21 @@ const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-fl
   throw new Error(`CRITICAL_CORE_FAILURE: ${lastError}. \n\nTroubleshoot:\n1. Check if 'Generative Language API' is ENABLED in Google AI Studio.\n2. Ensure your API Key is valid and has no spaces.\n3. Try switching to 'Groq' in Settings if Gemini persists in failing.`);
 };
 
+const callNvidia = async (systemPrompt, userText, apiKey, model, maxTokens = 1000) => {
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: maxTokens,
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
+    })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content;
+};
+
 const callRouter = async (systemPrompt, userText, apiKey, baseUrl, model, maxTokens = 1000) => {
   const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const response = await fetch(url, {
@@ -88,8 +103,9 @@ const callRouter = async (systemPrompt, userText, apiKey, baseUrl, model, maxTok
 };
 
 const callAI = async (systemPrompt, userText, config) => {
-  const { provider, model, groqKey, geminiKey, routerKey, routerBase, maxTokens } = config;
+  const { provider, model, groqKey, geminiKey, nvidiaKey, routerKey, routerBase, maxTokens } = config;
   if (provider === 'gemini') return await callGemini(systemPrompt, userText, geminiKey, model);
+  if (provider === 'nvidia') return await callNvidia(systemPrompt, userText, nvidiaKey, model, maxTokens);
   if (provider === 'router') return await callRouter(systemPrompt, userText, routerKey, routerBase, model, maxTokens);
   return await callGroq(systemPrompt, userText, groqKey, model, maxTokens);
 };
@@ -743,6 +759,7 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
         >
           <option value="groq">Groq (Llama Models - Fast)</option>
           <option value="gemini">Google Gemini (Best for Large Texts)</option>
+          <option value="nvidia">NVIDIA NIM (Ultra High Performance)</option>
           <option value="router">Unified Router (AgentRouter/OneAPI)</option>
         </select>
         
@@ -776,6 +793,16 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
                 <input type={showGemini ? "text" : "password"} value={config.geminiKey} onChange={e => setConfig({...config, geminiKey: e.target.value})}
                   className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white text-sm" />
                 <button onClick={() => setShowGemini(!showGemini)} className="px-2 text-xs">👁</button>
+              </div>
+            </div>
+
+            {/* NVIDIA */}
+            <div className={`p-4 border rounded ${config.provider === 'nvidia' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+              <label className="block text-[10px] text-gray-500 mb-2 uppercase courier">NVIDIA NIM API Key</label>
+              <div className="flex gap-2">
+                <input type={showRouter ? "text" : "password"} value={config.nvidiaKey} onChange={e => setConfig({...config, nvidiaKey: e.target.value})}
+                  className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white text-sm" />
+                <button onClick={() => setShowRouter(!showRouter)} className="px-2 text-xs">👁</button>
               </div>
             </div>
 
@@ -908,6 +935,7 @@ export default function App() {
     model: 'gemini-1.5-flash',
     groqKey: '',
     geminiKey: '',
+    nvidiaKey: '',
     routerKey: '',
     routerBase: 'https://agentrouter.org/v1'
   });
