@@ -86,17 +86,26 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
       const userObj = await window.storage.get(`users:${email}`);
       if (!userObj) return setError("User not found.");
       if (userObj.value.password !== password) return setError("Invalid password.");
+      if (userObj.value.status === 'pending') return setError("Account pending admin approval.");
       setCurrentUser(userObj.value);
       setPage('detect');
     } else {
       const exists = await window.storage.get(`users:${email}`);
       if (exists) return setError("User already exists.");
+      if (password.length < 6) return setError("Password must be at least 6 characters.");
       
       const role = userKeys.length === 0 ? 'admin' : 'user';
-      const newUser = { email, password, role, wordsScanned: 0 };
+      const status = role === 'admin' ? 'approved' : 'pending';
+      const newUser = { email, password, role, status, wordsScanned: 0 };
       await window.storage.set(`users:${email}`, newUser);
-      setCurrentUser(newUser);
-      setPage('detect');
+      
+      if (role === 'admin') {
+        setCurrentUser(newUser);
+        setPage('detect');
+      } else {
+        setError("Signup successful! Pending admin approval.");
+        setEmail(''); setPassword('');
+      }
     }
   };
 
@@ -451,6 +460,16 @@ const AdminPage = () => {
     }
   };
 
+  const approveUser = async (email) => {
+    const key = `users:${email}`;
+    const data = await window.storage.get(key);
+    if (data) {
+      data.value.status = 'approved';
+      await window.storage.set(key, data.value);
+      loadUsers();
+    }
+  };
+
   const deleteUser = async (email) => {
     if(window.confirm(`Delete ${email}?`)) {
       await window.storage.remove(`users:${email}`);
@@ -467,6 +486,7 @@ const AdminPage = () => {
             <tr>
               <th className="p-4">Email</th>
               <th className="p-4">Role</th>
+              <th className="p-4">Status</th>
               <th className="p-4">Words Scanned</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
@@ -478,8 +498,14 @@ const AdminPage = () => {
                 <td className="p-4">
                   <span className={`px-2 py-1 rounded text-xs ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-300'}`}>{u.role}</span>
                 </td>
+                <td className="p-4">
+                  <span className={`px-2 py-1 rounded text-xs ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+                </td>
                 <td className="p-4 text-gray-300">{u.wordsScanned || 0}</td>
                 <td className="p-4 text-right flex justify-end gap-2">
+                  {u.status === 'pending' && (
+                    <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-xs px-2 py-1 rounded">Approve</button>
+                  )}
                   <button onClick={()=>toggleRole(u.email, u.role)} className="border border-[#444] hover:border-[#00ff88] text-xs px-2 py-1 rounded">Toggle Role</button>
                   <button onClick={()=>deleteUser(u.email)} className="bg-[#ff3366]/20 text-[#ff3366] hover:bg-[#ff3366] hover:text-white text-xs px-2 py-1 rounded">Delete</button>
                 </td>
@@ -492,9 +518,15 @@ const AdminPage = () => {
   );
 };
 
-const SettingsPage = ({ apiKey, setApiKey, model, setModel, isAdmin }) => {
+const SettingsPage = ({ apiKey, setApiKey, model, setModel, isAdmin, currentUser, setCurrentUser }) => {
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
 
   const saveGlobalKey = async () => {
     if(isAdmin) {
@@ -540,6 +572,34 @@ const SettingsPage = ({ apiKey, setApiKey, model, setModel, isAdmin }) => {
             </button>
           </div>
         )}
+
+        <div className="mt-6 pt-6 border-t border-[#333]">
+          <h3 className="text-xl orbitron text-[#00ff88] mb-4">Change Password</h3>
+          <div className="flex flex-col gap-4">
+            {pwError && <div className="text-[#ff3366] text-sm">{pwError}</div>}
+            {pwSuccess && <div className="text-[#00ff88] text-sm">{pwSuccess}</div>}
+            <input type="password" placeholder="Old Password" value={oldPassword} onChange={e => setOldPassword(e.target.value)}
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+            <input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+            <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+              className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
+            <button onClick={async () => {
+              setPwError(''); setPwSuccess('');
+              if (oldPassword !== currentUser.password) return setPwError("Incorrect old password.");
+              if (newPassword !== confirmPassword) return setPwError("Passwords do not match.");
+              if (newPassword.length < 6) return setPwError("New password must be at least 6 characters.");
+              
+              const updatedUser = { ...currentUser, password: newPassword };
+              await window.storage.set(`users:${currentUser.email}`, updatedUser);
+              setCurrentUser(updatedUser);
+              setPwSuccess("Password updated successfully!");
+              setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+            }} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition">
+              Update Password
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -651,7 +711,7 @@ export default function App() {
         {page === 'humanize' && <HumanizePage currentUser={currentUser} apiKey={groqApiKey} model={model} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
         {page === 'history' && <HistoryPage currentUser={currentUser} />}
         {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
-        {page === 'settings' && <SettingsPage apiKey={groqApiKey} setApiKey={setGroqApiKey} model={model} setModel={setModel} isAdmin={currentUser?.role === 'admin'} />}
+        {page === 'settings' && <SettingsPage apiKey={groqApiKey} setApiKey={setGroqApiKey} model={model} setModel={setModel} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       </main>
     </div>
   );
