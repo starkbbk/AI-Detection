@@ -75,6 +75,78 @@ const callAI = async (systemPrompt, userText, config) => {
 };
 
 // -- Components --
+const GridBackground = () => {
+  useEffect(() => {
+    const canvas = document.getElementById('grid-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    
+    const gridSize = 40;
+    const cells = [];
+    const snakes = Array(5).fill(0).map(() => ({
+      x: Math.floor(Math.random() * (width / gridSize)),
+      y: Math.floor(Math.random() * (height / gridSize)),
+      length: 5 + Math.floor(Math.random() * 5),
+      dir: Math.floor(Math.random() * 4),
+      trail: []
+    }));
+
+    const draw = () => {
+      ctx.fillStyle = "#050505";
+      ctx.fillRect(0, 0, width, height);
+      
+      // Draw grid
+      ctx.strokeStyle = "rgba(0, 255, 136, 0.05)";
+      ctx.lineWidth = 1;
+      for(let x = 0; x < width; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+      }
+      for(let y = 0; y < height; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+      }
+
+      // Update and draw snakes
+      snakes.forEach(s => {
+        s.trail.push({x: s.x, y: s.y});
+        if(s.trail.length > s.length) s.trail.shift();
+
+        if(Math.random() > 0.8) s.dir = Math.floor(Math.random() * 4);
+        if(s.dir === 0) s.x++;
+        else if(s.dir === 1) s.x--;
+        else if(s.dir === 2) s.y++;
+        else s.y--;
+
+        if(s.x < 0) s.x = Math.floor(width / gridSize);
+        if(s.x > width / gridSize) s.x = 0;
+        if(s.y < 0) s.y = Math.floor(height / gridSize);
+        if(s.y > height / gridSize) s.y = 0;
+
+        s.trail.forEach((t, i) => {
+          const alpha = (i / s.trail.length) * 0.8;
+          ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = "#00ff88";
+          ctx.fillRect(t.x * gridSize + 2, t.y * gridSize + 2, gridSize - 4, gridSize - 4);
+        });
+      });
+      ctx.shadowBlur = 0;
+    };
+
+    const interval = setInterval(draw, 100);
+    const handleResize = () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
+    return () => { clearInterval(interval); window.removeEventListener('resize', handleResize); };
+  }, []);
+
+  return <canvas id="grid-canvas" className="fixed inset-0 z-0 pointer-events-none" />;
+};
+
 const CircularGauge = ({ percentage }) => {
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
@@ -82,16 +154,16 @@ const CircularGauge = ({ percentage }) => {
   const color = percentage > 70 ? '#ff3366' : percentage > 40 ? '#ffaa00' : '#00ff88';
 
   return (
-    <div className="relative w-40 h-40 flex items-center justify-center">
+    <div className="relative w-40 h-40 flex items-center justify-center animate-pulse">
       <svg className="w-full h-full transform -rotate-90">
-        <circle cx="80" cy="80" r="60" stroke="#222" strokeWidth="12" fill="none" />
+        <circle cx="80" cy="80" r="60" stroke="#111" strokeWidth="12" fill="none" />
         <circle cx="80" cy="80" r="60" stroke={color} strokeWidth="12" fill="none" 
           strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} 
           className="transition-all duration-1000 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold orbitron" style={{ color }}>{percentage}%</span>
-        <span className="text-xs text-gray-400">AI</span>
+        <span className="text-3xl font-bold orbitron" style={{ color, textShadow: `0 0 10px ${color}` }}>{percentage}%</span>
+        <span className="text-[10px] text-gray-400 courier tracking-widest">AI_DETECTION</span>
       </div>
     </div>
   );
@@ -101,58 +173,105 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    setLoading(true);
     setError('');
-    if (!email || !password) return setError("Fields required.");
+    if (!email || !password) {
+      setLoading(false);
+      return setError("USER_INPUT_REQUIRED");
+    }
     
     const allKeys = await window.storage.keys();
     const userKeys = allKeys.filter(k => k.startsWith('users:'));
     
-    if (isLogin) {
-      const userObj = await window.storage.get(`users:${email}`);
-      if (!userObj) return setError("User not found.");
-      if (userObj.value.password !== password) return setError("Invalid password.");
-      if (userObj.value.status === 'pending') return setError("Account pending admin approval.");
-      setCurrentUser(userObj.value);
-      setPage('detect');
-    } else {
-      const exists = await window.storage.get(`users:${email}`);
-      if (exists) return setError("User already exists.");
-      if (password.length < 6) return setError("Password must be at least 6 characters.");
-      
-      const role = userKeys.length === 0 ? 'admin' : 'user';
-      const status = role === 'admin' ? 'approved' : 'pending';
-      const newUser = { email, password, role, status, wordsScanned: 0 };
-      await window.storage.set(`users:${email}`, newUser);
-      
-      if (role === 'admin') {
-        setCurrentUser(newUser);
+    try {
+      if (isLogin) {
+        const userObj = await window.storage.get(`users:${email}`);
+        if (!userObj) throw new Error("ID_NOT_FOUND");
+        if (userObj.value.password !== password) throw new Error("AUTH_KEY_INVALID");
+        if (userObj.value.status === 'pending') throw new Error("PENDING_ADMIN_LINK");
+        setCurrentUser(userObj.value);
         setPage('detect');
       } else {
-        setError("Signup successful! Pending admin approval.");
-        setEmail(''); setPassword('');
+        const exists = await window.storage.get(`users:${email}`);
+        if (exists) throw new Error("ID_RESERVED");
+        if (password.length < 6) throw new Error("KEY_LENGTH_MIN_6");
+        
+        const role = userKeys.length === 0 ? 'admin' : 'user';
+        const status = role === 'admin' ? 'approved' : 'pending';
+        const newUser = { email, password, role, status, wordsScanned: 0 };
+        await window.storage.set(`users:${email}`, newUser);
+        
+        if (role === 'admin') {
+          setCurrentUser(newUser);
+          setPage('detect');
+        } else {
+          setError("INIT_SUCCESS_AWAIT_LINK");
+          setEmail(''); setPassword('');
+        }
       }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="animated-border p-[1px] w-full max-w-md">
-        <div className="glass p-8 rounded-lg flex flex-col gap-4">
-          <h1 className="text-3xl orbitron text-[#00ff88] text-center mb-4">{isLogin ? 'Login' : 'Sign Up'}</h1>
-          {error && <div className="text-[#ff3366] text-sm text-center">{error}</div>}
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-            className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
-          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
-            className="bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white" />
-          <button onClick={handleSubmit} className="bg-[#00ff88] text-black font-bold py-3 rounded mt-4 hover:bg-[#00cc6a] transition">
-            {isLogin ? 'Enter' : 'Register'}
-          </button>
-          <div className="text-center mt-4">
-            <span className="text-gray-400 cursor-pointer hover:text-white" onClick={() => setPage(isLogin ? 'signup' : 'login')}>
-              {isLogin ? "Need an account? Sign up" : "Already have an account? Login"}
-            </span>
+    <div className="fixed inset-0 flex items-center justify-center bg-black overflow-hidden p-4">
+      <GridBackground />
+      
+      <div className="z-20 w-full max-w-md animate-slide-up">
+        <div className="bg-[#1a1a1a]/95 p-10 rounded shadow-2xl border border-white/5">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl orbitron font-bold text-[#00ff88] tracking-widest uppercase">
+              {isLogin ? 'SIGN IN' : 'SIGN UP'}
+            </h2>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            {error && <div className="text-[#ff3366] text-xs courier bg-red-900/10 p-3 border border-red-500/20 rounded">
+              {'>'} ERROR: {error}
+            </div>}
+            
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 courier ml-1 uppercase tracking-widest">Username</label>
+              <input 
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)}
+                className="w-full bg-[#2a2a2a] border-none p-4 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 transition-all"
+                placeholder="root@mainframe"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-gray-500 courier ml-1 uppercase tracking-widest">Password</label>
+              <input 
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)}
+                className="w-full bg-[#2a2a2a] border-none p-4 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 transition-all"
+                placeholder="********"
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-[10px] courier text-gray-500 uppercase tracking-widest px-1">
+              <span className="hover:text-white cursor-pointer transition">Forgot Password</span>
+              <span className="text-[#00ff88] hover:underline cursor-pointer transition" onClick={() => setPage(isLogin ? 'signup' : 'login')}>
+                {isLogin ? 'Signup' : 'Login'}
+              </span>
+            </div>
+
+            <button 
+              onClick={handleSubmit} 
+              disabled={loading}
+              className="w-full bg-[#00ff00] text-black font-bold py-4 rounded orbitron hover:bg-[#00ff88] shadow-[0_0_20px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,136,0.5)] transition-all active:scale-95 uppercase tracking-widest"
+            >
+              {loading ? 'WAITING...' : (isLogin ? 'Login' : 'Initialize')}
+            </button>
           </div>
         </div>
       </div>
@@ -785,36 +904,40 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-[#0a0a0f]">
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-black text-[#00ff88] courier">
+      <GridBackground />
+      
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
       
-      <main className="flex-1 overflow-y-auto relative flex flex-col">
+      <main className="flex-1 overflow-y-auto relative flex flex-col z-10">
         {currentUser && (
-          <div className="md:hidden flex items-center justify-between p-4 bg-[#0a0a0f] border-b border-[#222] z-30">
+          <div className="md:hidden flex items-center justify-between p-4 bg-black/80 border-b border-[#00ff88]/20 z-30 backdrop-blur-md">
             <h1 className="text-lg orbitron text-[#00ff88] font-bold">GOD MODE</h1>
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#00ff88]">
-              <div className="w-6 h-0.5 bg-current mb-1"></div>
-              <div className="w-6 h-0.5 bg-current mb-1"></div>
-              <div className="w-6 h-0.5 bg-current"></div>
+              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_5px_#00ff88]"></div>
+              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_5px_#00ff88]"></div>
+              <div className="w-6 h-0.5 bg-current shadow-[0_0_5px_#00ff88]"></div>
             </button>
           </div>
         )}
 
         <div className="p-4 md:p-8 flex-1">
           {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
-            <div className="bg-[#ff3366]/20 border border-[#ff3366] text-[#ff3366] p-4 rounded-lg mb-6 flex justify-between items-center">
-              <span>⚠️ No API Keys configured.</span>
-              <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-sm hover:bg-red-600">Configure</button>
+            <div className="bg-[#ff3366]/10 border border-[#ff3366]/30 text-[#ff3366] p-4 rounded mb-6 flex justify-between items-center courier text-xs animate-pulse">
+              <span>{'>'} WARNING: NO_API_KEYS_DETECTED</span>
+              <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-[10px] hover:bg-red-600 transition">RESOLVE</button>
             </div>
           )}
           
-          {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
-          {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
-          {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
-          {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
-          {page === 'history' && <HistoryPage currentUser={currentUser} />}
-          {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
-          {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+          <div className="animate-fade-in h-full">
+            {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
+            {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
+            {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
+            {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
+            {page === 'history' && <HistoryPage currentUser={currentUser} />}
+            {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
+            {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+          </div>
         </div>
       </main>
     </div>

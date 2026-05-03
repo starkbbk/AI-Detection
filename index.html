@@ -3,7 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Detection God Mode</title>
+    <title>GOD MODE | AI Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --hacker-green: #00ff88;
+        --hacker-dark: #050505;
+      }
+      body {
+        margin: 0;
+        background-color: var(--hacker-dark);
+        color: var(--hacker-green);
+        font-family: 'JetBrains Mono', monospace;
+        overflow: hidden;
+      }
+      .orbitron { font-family: 'Orbitron', sans-serif; }
+      .courier { font-family: 'JetBrains Mono', monospace; }
+      
+      /* CRT Scanline Effect */
+      body::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+        z-index: 9999;
+        background-size: 100% 2px, 3px 100%;
+        pointer-events: none;
+      }
+      
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--hacker-green) transparent;
+      }
+      *::-webkit-scrollbar { width: 4px; }
+      *::-webkit-scrollbar-thumb { background: var(--hacker-green); border-radius: 10px; }
+      
+      .glass-hacker {
+        background: rgba(0, 20, 10, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 255, 136, 0.2);
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.1);
+      }
+      
+      @keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
+      }
+      .glitch:hover { animation: glitch 0.3s infinite; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
