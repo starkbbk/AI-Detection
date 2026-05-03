@@ -41,34 +41,34 @@ const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000)
 };
 
 const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
-  const cleanModel = model.split('/').pop().trim() || 'gemini-1.5-flash';
+  const cleanKey = apiKey?.trim();
+  const cleanModel = (model || 'gemini-1.5-flash').split('/').pop().trim();
   
-  const attemptCall = async (modelId) => {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
-    });
-    return await response.json();
-  };
+  // Sequential fallback list
+  const modelsToTry = [cleanModel, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+  
+  let lastError = null;
 
-  try {
-    let data = await attemptCall(cleanModel);
-    
-    // Fallback logic: If Flash fails, try Pro
-    if (data.error && (data.error.message.includes('not found') || data.error.message.includes('not supported'))) {
-      data = await attemptCall('gemini-pro');
+  for (const mId of modelsToTry) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${mId}:generateContent?key=${cleanKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
+      });
+      const data = await response.json();
+      
+      if (!data.error) {
+        if (!data.candidates || !data.candidates[0]) throw new Error("EMPTY_RESPONSE");
+        return data.candidates[0].content.parts[0].text;
+      }
+      lastError = data.error.message;
+    } catch (err) {
+      lastError = err.message;
     }
-
-    if (data.error) {
-      throw new Error(`[${cleanModel}] ${data.error.message}. TIP: Ensure 'Generative Language API' is enabled in Google AI Studio.`);
-    }
-    
-    if (!data.candidates || !data.candidates[0]) throw new Error("No response from Gemini.");
-    return data.candidates[0].content.parts[0].text;
-  } catch (err) {
-    throw new Error(`Gemini Core Error: ${err.message}`);
   }
+
+  throw new Error(`CRITICAL_CORE_FAILURE: ${lastError}. \n\nTroubleshoot:\n1. Check if 'Generative Language API' is ENABLED in Google AI Studio.\n2. Ensure your API Key is valid and has no spaces.\n3. Try switching to 'Groq' in Settings if Gemini persists in failing.`);
 };
 
 const callRouter = async (systemPrompt, userText, apiKey, baseUrl, model, maxTokens = 1000) => {
