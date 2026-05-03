@@ -75,77 +75,6 @@ const callAI = async (systemPrompt, userText, config) => {
 };
 
 // -- Components --
-const GridBackground = () => {
-  useEffect(() => {
-    const canvas = document.getElementById('grid-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    let width = canvas.width = window.innerWidth;
-    let height = canvas.height = window.innerHeight;
-    
-    const gridSize = 40;
-    const snakes = Array(8).fill(0).map(() => ({
-      x: Math.floor(Math.random() * (width / gridSize)),
-      y: Math.floor(Math.random() * (height / gridSize)),
-      length: 8 + Math.floor(Math.random() * 10),
-      dir: Math.floor(Math.random() * 4),
-      trail: []
-    }));
-
-    const draw = () => {
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, width, height);
-      
-      // Draw grid
-      ctx.strokeStyle = "rgba(0, 255, 136, 0.08)";
-      ctx.lineWidth = 1;
-      for(let x = 0; x < width; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-      }
-      for(let y = 0; y < height; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
-      }
-
-      // Update and draw snakes
-      snakes.forEach(s => {
-        s.trail.push({x: s.x, y: s.y});
-        if(s.trail.length > s.length) s.trail.shift();
-
-        if(Math.random() > 0.8) s.dir = Math.floor(Math.random() * 4);
-        if(s.dir === 0) s.x++;
-        else if(s.dir === 1) s.x--;
-        else if(s.dir === 2) s.y++;
-        else s.y--;
-
-        if(s.x < 0) s.x = Math.floor(width / gridSize);
-        if(s.x > width / gridSize) s.x = 0;
-        if(s.y < 0) s.y = Math.floor(height / gridSize);
-        if(s.y > height / gridSize) s.y = 0;
-
-        s.trail.forEach((t, i) => {
-          const alpha = (i / s.trail.length) * 0.9;
-          ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = "#00ff88";
-          ctx.fillRect(t.x * gridSize + 2, t.y * gridSize + 2, gridSize - 4, gridSize - 4);
-        });
-      });
-      ctx.shadowBlur = 0;
-    };
-
-    const interval = setInterval(draw, 80);
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', handleResize);
-    return () => { clearInterval(interval); window.removeEventListener('resize', handleResize); };
-  }, []);
-
-  return <canvas id="grid-canvas" className="fixed inset-0 z-0 pointer-events-none" />;
-};
-
 const CircularGauge = ({ percentage }) => {
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
@@ -220,7 +149,6 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-transparent overflow-hidden p-4">
-      {/* GridBackground is already in App.jsx parent */}
       
       <div className="z-20 w-full max-w-md animate-slide-up">
         <div className="bg-[#1a1a1a]/95 p-10 rounded shadow-2xl border border-white/5">
@@ -914,13 +842,11 @@ export default function App() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-black text-[#00ff88] courier">
-      <GridBackground />
-      
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
       
-      <main className="flex-1 overflow-y-auto relative flex flex-col z-10 bg-black/10 backdrop-blur-[2px]">
+      <main className="flex-1 overflow-y-auto relative flex flex-col z-10">
         {currentUser && (
-          <div className="md:hidden flex items-center justify-between p-4 bg-black/80 border-b border-[#00ff88]/20 z-30 backdrop-blur-md">
+          <div className="md:hidden sticky top-0 flex items-center justify-between p-4 bg-black/90 border-b border-[#00ff88]/20 z-50 backdrop-blur-lg">
             <h1 className="text-lg orbitron text-[#00ff88] font-bold">GOD MODE</h1>
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#00ff88]">
               <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_5px_#00ff88]"></div>
