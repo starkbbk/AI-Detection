@@ -667,7 +667,6 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
             }} className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition">
               Update Password
             </button>
-          </div>
         </div>
       </div>
     </div>
