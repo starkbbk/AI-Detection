@@ -41,7 +41,9 @@ const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000)
 };
 
 const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  // Sanitize model name to prevent double "models/" in URL
+  const cleanModel = model.replace(/^models\//, '');
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${cleanModel}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
