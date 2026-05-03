@@ -25,9 +25,11 @@ const extractTextFromDOCX = async (file) => {
   return result.value;
 };
 
-const callGroq = async (systemPrompt, userText, apiKey, maxTokens = 1000, model = 'llama-3.3-70b-versatile') => {
+const callAI = async (systemPrompt, userText, config) => {
+  const { model, apiKey, baseUrl, maxTokens = 1000 } = config;
   if (!apiKey) throw new Error("API Key is missing. Please set it in Settings.");
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  
+  const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -42,36 +44,10 @@ const callGroq = async (systemPrompt, userText, apiKey, maxTokens = 1000, model 
       ]
     })
   });
+  
   const data = await response.json();
   if (data.error) throw new Error(data.error.message);
   return data.choices[0].message.content;
-};
-
-const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
-  if (!apiKey) throw new Error("Gemini API Key is missing. Please set it in Settings.");
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: `${systemPrompt}\n\nUSER TEXT TO ANALYZE:\n${userText}` }]
-      }]
-    })
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates[0].content.parts[0].text;
-};
-
-const callAI = async (systemPrompt, userText, config) => {
-  const { model, groqKey, geminiKey } = config;
-  if (model.startsWith('gemini')) {
-    return await callGemini(systemPrompt, userText, geminiKey, model);
-  } else {
-    return await callGroq(systemPrompt, userText, groqKey, model.includes('humanize') ? 4000 : 1000, model);
-  }
 };
 
 // -- Components --
@@ -160,7 +136,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
   );
 };
 
-const DetectPage = ({ currentUser, groqKey, geminiKey, model, onHumanizeRequest, initialText = '' }) => {
+const DetectPage = ({ currentUser, apiKey, baseUrl, model, onHumanizeRequest, initialText = '' }) => {
   const [text, setText] = useState(initialText);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -194,9 +170,7 @@ const DetectPage = ({ currentUser, groqKey, geminiKey, model, onHumanizeRequest,
       return setError("Word limit exceeded (5000). Please upgrade to Admin/Pro.");
     }
     
-    const isGemini = model.startsWith('gemini');
-    if (!isGemini && !groqKey) return setError("Groq API Key not set. Please go to Settings.");
-    if (isGemini && !geminiKey) return setError("Gemini API Key not set. Please go to Settings.");
+    if (!apiKey) return setError("API Key not set. Please go to Settings.");
 
     setLoading(true);
     const systemPrompt = `You are an expert AI content detector. Analyze the text and return ONLY a JSON object:
@@ -214,7 +188,7 @@ const DetectPage = ({ currentUser, groqKey, geminiKey, model, onHumanizeRequest,
 Return ONLY the JSON. No markdown. No explanation.`;
 
     try {
-      const res = await callAI(systemPrompt, text, { model, groqKey, geminiKey });
+      const res = await callAI(systemPrompt, text, { model, apiKey, baseUrl, maxTokens: 1000 });
       const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
       const data = JSON.parse(raw);
       setResult(data);
@@ -307,7 +281,7 @@ Return ONLY the JSON. No markdown. No explanation.`;
   );
 };
 
-const HumanizePage = ({ currentUser, groqKey, geminiKey, model, initialText = '', onDetectRequest }) => {
+const HumanizePage = ({ currentUser, apiKey, baseUrl, model, initialText = '', onDetectRequest }) => {
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
@@ -322,9 +296,7 @@ const HumanizePage = ({ currentUser, groqKey, geminiKey, model, initialText = ''
       return setError("Word limit exceeded (5000). Please upgrade.");
     }
     
-    const isGemini = model.startsWith('gemini');
-    if (!isGemini && !groqKey) return setError("Groq API Key not set. Please go to Settings.");
-    if (isGemini && !geminiKey) return setError("Gemini API Key not set. Please go to Settings.");
+    if (!apiKey) return setError("API Key not set. Please go to Settings.");
 
     setLoading(true);
     const systemPrompt = `You are an expert text humanizer. Rewrite the given text to sound 100% human-written.
@@ -337,7 +309,7 @@ Rules:
 - Output ONLY the rewritten text. No explanations. No preamble.`;
 
     try {
-      const res = await callAI(systemPrompt, text, { model, groqKey, geminiKey });
+      const res = await callAI(systemPrompt, text, { model, apiKey, baseUrl, maxTokens: 4000 });
       setResult(res.trim());
       await window.storage.set(`history:${currentUser.email}:${Date.now()}`, {
         type: 'humanize',
@@ -551,9 +523,8 @@ const AdminPage = () => {
   );
 };
 
-const SettingsPage = ({ groqKey, setGroqKey, geminiKey, setGeminiKey, model, setModel, isAdmin, currentUser, setCurrentUser }) => {
-  const [showGroq, setShowGroq] = useState(false);
-  const [showGemini, setShowGemini] = useState(false);
+const SettingsPage = ({ apiKey, setApiKey, baseUrl, setBaseUrl, model, setModel, isAdmin, currentUser, setCurrentUser }) => {
+  const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
   
   const [oldPassword, setOldPassword] = useState('');
@@ -562,9 +533,11 @@ const SettingsPage = ({ groqKey, setGroqKey, geminiKey, setGeminiKey, model, set
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
 
-  const saveGlobalKey = async () => {
+  const saveGlobal = async () => {
     if(isAdmin) {
-      await window.storage.set('config:groqKey', apiKey);
+      await window.storage.set('config:routerKey', apiKey);
+      await window.storage.set('config:routerBase', baseUrl);
+      await window.storage.set('config:model', model);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
@@ -575,56 +548,47 @@ const SettingsPage = ({ groqKey, setGroqKey, geminiKey, setGeminiKey, model, set
       <h2 className="text-2xl orbitron text-[#00ff88]">Settings</h2>
       <div className="glass p-6 rounded-lg flex flex-col gap-4">
         <div>
-          <label className="block text-gray-400 mb-2">Groq API Key (Llama Models)</label>
+          <label className="block text-gray-400 mb-2">AgentRouter / OneAPI Base URL</label>
+          <input 
+            type="text" 
+            value={baseUrl} 
+            onChange={e => setBaseUrl(e.target.value)}
+            className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
+            placeholder="https://agentrouter.org/v1"
+          />
+        </div>
+
+        <div>
+          <label className="block text-gray-400 mb-2">Router API Key</label>
           <div className="flex gap-2">
             <input 
-              type={showGroq ? "text" : "password"} 
-              value={groqKey} 
-              onChange={e => setGroqKey(e.target.value)}
+              type={showKey ? "text" : "password"} 
+              value={apiKey} 
+              onChange={e => setApiKey(e.target.value)}
               className="flex-1 bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-              placeholder="gsk_..."
+              placeholder="sk-..."
             />
-            <button onClick={() => setShowGroq(!showGroq)} className="bg-[#222] px-4 rounded border border-[#333] hover:bg-[#333]">👁</button>
+            <button onClick={() => setShowKey(!showKey)} className="bg-[#222] px-4 rounded border border-[#333] hover:bg-[#333]">👁</button>
           </div>
         </div>
 
         <div>
-          <label className="block text-gray-400 mb-2">Gemini API Key (Google - Handles Large Texts)</label>
-          <div className="flex gap-2">
-            <input 
-              type={showGemini ? "text" : "password"} 
-              value={geminiKey} 
-              onChange={e => setGeminiKey(e.target.value)}
-              className="flex-1 bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-              placeholder="AIza..."
-            />
-            <button onClick={() => setShowGemini(!showGemini)} className="bg-[#222] px-4 rounded border border-[#333] hover:bg-[#333]">👁</button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">Get your free key at <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-[#00ff88] underline">aistudio.google.com</a></p>
-        </div>
-
-        <div>
-          <label className="block text-gray-400 mb-2">Model</label>
-          <select value={model} onChange={e => setModel(e.target.value)} className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white">
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended - Best for Large Texts)</option>
-            <option value="llama-3.3-70b-versatile">Llama 3.3 70b (Groq - High Quality)</option>
-            <option value="mixtral-8x7b-32768">Mixtral 8x7b (Groq - Fallback)</option>
-            <option value="llama3-8b-8192">Llama 3 8b (Groq - Fastest)</option>
-          </select>
+          <label className="block text-gray-400 mb-2">Model Name</label>
+          <input 
+            type="text" 
+            value={model} 
+            onChange={e => setModel(e.target.value)}
+            className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
+            placeholder="gemini-1.5-flash or llama-3.3-70b-versatile"
+          />
+          <p className="text-xs text-gray-500 mt-2">Enter the exact model ID from your router dashboard.</p>
         </div>
 
         {isAdmin && (
           <div className="mt-4 pt-4 border-t border-[#333]">
             <h3 className="text-lg text-[#ff3366] mb-2 orbitron">Admin Controls</h3>
-            <button onClick={async () => {
-              if(isAdmin) {
-                await window.storage.set('config:groqKey', groqKey);
-                await window.storage.set('config:geminiKey', geminiKey);
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2000);
-              }
-            }} className="bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-2 px-4 rounded hover:bg-[#ff3366] hover:text-white transition">
-              {saved ? 'Saved!' : 'Save Shared API Keys for all users'}
+            <button onClick={saveGlobal} className="bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-2 px-4 rounded hover:bg-[#ff3366] hover:text-white transition">
+              {saved ? 'Saved!' : 'Save Settings as Default for all users'}
             </button>
           </div>
         )}
@@ -712,8 +676,8 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser }) => {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [page, setPage] = useState('login');
-  const [groqApiKey, setGroqApiKey] = useState('');
-  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [routerApiKey, setRouterApiKey] = useState('');
+  const [routerBaseUrl, setRouterBaseUrl] = useState('https://agentrouter.org/v1');
   const [model, setModel] = useState('gemini-1.5-flash');
   const [loadingInit, setLoadingInit] = useState(true);
   const [transferText, setTransferText] = useState('');
@@ -728,10 +692,12 @@ export default function App() {
     document.head.appendChild(script);
 
     const init = async () => {
-      const gKey = await window.storage.get('config:groqKey');
-      if (gKey) setGroqApiKey(gKey.value);
-      const gemKey = await window.storage.get('config:geminiKey');
-      if (gemKey) setGeminiApiKey(gemKey.value);
+      const rKey = await window.storage.get('config:routerKey');
+      if (rKey) setRouterApiKey(rKey.value);
+      const rBase = await window.storage.get('config:routerBase');
+      if (rBase) setRouterBaseUrl(rBase.value);
+      const rModel = await window.storage.get('config:model');
+      if (rModel) setModel(rModel.value);
       setLoadingInit(false);
     };
     init();
@@ -757,20 +723,20 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       <main className="flex-1 overflow-y-auto p-8 relative">
-        {(!groqApiKey && !geminiApiKey) && currentUser && page !== 'settings' && (
+        {!routerApiKey && currentUser && page !== 'settings' && (
           <div className="bg-[#ff3366]/20 border border-[#ff3366] text-[#ff3366] p-4 rounded-lg mb-6 flex justify-between items-center">
-            <span>⚠️ API Keys are not configured. Scans will fail.</span>
+            <span>⚠️ API Router is not configured. Scans will fail.</span>
             <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-sm hover:bg-red-600">Configure</button>
           </div>
         )}
         
         {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
         {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
-        {page === 'detect' && <DetectPage currentUser={currentUser} groqKey={groqApiKey} geminiKey={geminiApiKey} model={model} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
-        {page === 'humanize' && <HumanizePage currentUser={currentUser} groqKey={groqApiKey} geminiKey={geminiApiKey} model={model} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
+        {page === 'detect' && <DetectPage currentUser={currentUser} apiKey={routerApiKey} baseUrl={routerBaseUrl} model={model} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
+        {page === 'humanize' && <HumanizePage currentUser={currentUser} apiKey={routerApiKey} baseUrl={routerBaseUrl} model={model} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
         {page === 'history' && <HistoryPage currentUser={currentUser} />}
         {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
-        {page === 'settings' && <SettingsPage groqKey={groqApiKey} setGroqKey={setGroqApiKey} geminiKey={geminiApiKey} setGeminiKey={setGeminiApiKey} model={model} setModel={setModel} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+        {page === 'settings' && <SettingsPage apiKey={routerApiKey} setApiKey={setRouterApiKey} baseUrl={routerBaseUrl} setBaseUrl={setRouterBaseUrl} model={model} setModel={setModel} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       </main>
     </div>
   );
