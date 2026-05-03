@@ -673,7 +673,7 @@ const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser 
   );
 };
 
-const Sidebar = ({ page, setPage, currentUser, setCurrentUser }) => {
+const Sidebar = ({ page, setPage, currentUser, setCurrentUser, isOpen, setIsOpen }) => {
   const navItems = [
     { id: 'detect', label: 'AI Detection', icon: <Shield size={18} /> },
     { id: 'humanize', label: 'Humanizer', icon: <Wand2 size={18} /> },
@@ -687,43 +687,59 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser }) => {
   navItems.push({ id: 'settings', label: 'Settings', icon: <Settings size={18} /> });
 
   return (
-    <div className="w-64 bg-[#0a0a0f] border-r border-[#222] flex flex-col h-full z-10">
-      <div className="p-6">
-        <h1 className="text-xl orbitron text-[#00ff88] font-bold">GOD MODE</h1>
-        <div className="text-xs text-gray-500 mt-1">Detection & Humanizer</div>
-      </div>
-      <div className="flex-1 px-4 flex flex-col gap-2 mt-4">
-        {navItems.map(item => (
-          <button 
-            key={item.id} 
-            onClick={() => setPage(item.id)}
-            className={`flex items-center gap-3 p-3 rounded transition-all ${page === item.id ? 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30' : 'text-gray-400 hover:bg-[#111] hover:text-white'}`}
-          >
-            {item.icon} {item.label}
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+        ></div>
+      )}
+
+      <div className={`fixed md:static inset-y-0 left-0 w-64 bg-[#0a0a0f] border-r border-[#222] flex flex-col h-full z-50 transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-xl orbitron text-[#00ff88] font-bold">GOD MODE</h1>
+            <div className="text-xs text-gray-500 mt-1">Detection & Humanizer</div>
+          </div>
+          <button className="md:hidden text-gray-400" onClick={() => setIsOpen(false)}>
+            <LogOut size={20} className="rotate-180" />
           </button>
-        ))}
-      </div>
-      <div className="p-4 border-t border-[#222]">
-        <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-8 h-8 rounded-full bg-[#111] flex items-center justify-center border border-[#333] text-xs">
-            {currentUser.email.substring(0,2).toUpperCase()}
-          </div>
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-sm truncate text-white">{currentUser.email}</span>
-            <span className={`text-xs ${currentUser.role==='admin' ? 'text-[#ff3366]' : 'text-gray-500'}`}>{currentUser.role.toUpperCase()}</span>
-          </div>
         </div>
-        <button onClick={() => setCurrentUser(null)} className="w-full flex items-center justify-center gap-2 p-2 rounded text-gray-400 hover:text-[#ff3366] hover:bg-[#111] transition">
-          <LogOut size={18} /> Logout
-        </button>
+        <div className="flex-1 px-4 flex flex-col gap-2 mt-4">
+          {navItems.map(item => (
+            <button 
+              key={item.id} 
+              onClick={() => { setPage(item.id); setIsOpen(false); }}
+              className={`flex items-center gap-3 p-3 rounded transition-all ${page === item.id ? 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30' : 'text-gray-400 hover:bg-[#111] hover:text-white'}`}
+            >
+              {item.icon} {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 border-t border-[#222]">
+          <div className="flex items-center gap-3 mb-4 px-2">
+            <div className="w-8 h-8 rounded-full bg-[#111] flex items-center justify-center border border-[#333] text-xs">
+              {currentUser.email.substring(0,2).toUpperCase()}
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-sm truncate text-white">{currentUser.email}</span>
+              <span className={`text-xs ${currentUser.role==='admin' ? 'text-[#ff3366]' : 'text-gray-500'}`}>{currentUser.role.toUpperCase()}</span>
+            </div>
+          </div>
+          <button onClick={() => setCurrentUser(null)} className="w-full flex items-center justify-center gap-2 p-2 rounded text-gray-400 hover:text-[#ff3366] hover:bg-[#111] transition">
+            <LogOut size={18} /> Logout
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [page, setPage] = useState('login');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [config, setConfig] = useState({
     provider: 'gemini',
     model: 'gemini-1.5-flash',
@@ -769,23 +785,37 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
-      {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
-      <main className="flex-1 overflow-y-auto p-8 relative">
-        {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
-          <div className="bg-[#ff3366]/20 border border-[#ff3366] text-[#ff3366] p-4 rounded-lg mb-6 flex justify-between items-center">
-            <span>⚠️ No API Keys configured. Scans will fail.</span>
-            <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-sm hover:bg-red-600">Configure</button>
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-[#0a0a0f]">
+      {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
+      
+      <main className="flex-1 overflow-y-auto relative flex flex-col">
+        {currentUser && (
+          <div className="md:hidden flex items-center justify-between p-4 bg-[#0a0a0f] border-b border-[#222] z-30">
+            <h1 className="text-lg orbitron text-[#00ff88] font-bold">GOD MODE</h1>
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#00ff88]">
+              <div className="w-6 h-0.5 bg-current mb-1"></div>
+              <div className="w-6 h-0.5 bg-current mb-1"></div>
+              <div className="w-6 h-0.5 bg-current"></div>
+            </button>
           </div>
         )}
-        
-        {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
-        {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
-        {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
-        {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
-        {page === 'history' && <HistoryPage currentUser={currentUser} />}
-        {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
-        {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+
+        <div className="p-4 md:p-8 flex-1">
+          {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
+            <div className="bg-[#ff3366]/20 border border-[#ff3366] text-[#ff3366] p-4 rounded-lg mb-6 flex justify-between items-center">
+              <span>⚠️ No API Keys configured.</span>
+              <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-sm hover:bg-red-600">Configure</button>
+            </div>
+          )}
+          
+          {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
+          {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
+          {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
+          {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
+          {page === 'history' && <HistoryPage currentUser={currentUser} />}
+          {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
+          {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+        </div>
       </main>
     </div>
   );
