@@ -607,12 +607,14 @@ const AdminPage = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl orbitron text-[#00ff88]">System Administration</h2>
-        <div className="text-xs courier text-gray-500">Total Accounts: {users.length}</div>
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto p-2 md:p-0">
+      <div className="flex justify-between items-center px-2 md:px-0">
+        <h2 className="text-xl md:text-2xl orbitron text-[#00ff88]">System Administration</h2>
+        <div className="text-[10px] courier text-gray-500 uppercase">Total: {users.length}</div>
       </div>
-      <div className="glass rounded-lg overflow-hidden border border-[#333]">
+
+      {/* Desktop Table */}
+      <div className="hidden md:block glass rounded-lg overflow-hidden border border-[#333]">
         <table className="w-full text-left text-sm">
           <thead className="bg-[#111] text-gray-400 border-b border-[#333]">
             <tr>
@@ -626,18 +628,18 @@ const AdminPage = () => {
           </thead>
           <tbody>
             {users.filter(u => u).map((u, i) => (
-              <tr key={i} className="border-b border-[#222] hover:bg-[#111] transition">
-                <td className="p-4 text-gray-300 font-mono text-xs">{u.email}</td>
+              <tr key={i} className="border-b border-[#222] hover:bg-[#111] transition text-xs">
+                <td className="p-4 text-gray-300 font-mono">{u.email}</td>
                 <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
                 </td>
                 <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900/40 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900/40 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
                 </td>
                 <td className="p-4">
-                  <span className={`px-2 py-1 rounded text-[10px] uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-500'}`}>{u.access || 'limited'}</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-500'}`}>{u.access || 'limited'}</span>
                 </td>
-                <td className="p-4 text-gray-300 text-xs">{u.wordsScanned || 0} words</td>
+                <td className="p-4 text-gray-300">{u.wordsScanned || 0} w</td>
                 <td className="p-4 text-right flex justify-end gap-1">
                   {u.status === 'pending' && (
                     <button onClick={()=>approveUser(u.email)} className="bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88] hover:text-black text-[9px] px-2 py-1 rounded uppercase">Approve</button>
@@ -650,6 +652,33 @@ const AdminPage = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card List */}
+      <div className="md:hidden flex flex-col gap-4">
+        {users.filter(u => u).map((u, i) => (
+          <div key={i} className="glass p-4 rounded-lg border border-[#333] flex flex-col gap-3">
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-1 overflow-hidden">
+                <span className="text-xs font-mono text-gray-300 truncate">{u.email}</span>
+                <div className="flex gap-2">
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.role==='admin' ? 'bg-[#ff3366]/20 text-[#ff3366]' : 'bg-gray-800 text-gray-400'}`}>{u.role}</span>
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.access==='full' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-400'}`}>{u.access || 'limited'}</span>
+                </div>
+              </div>
+              <span className={`text-[8px] px-1.5 py-0.5 rounded uppercase ${u.status==='approved' ? 'bg-[#00ff88]/20 text-[#00ff88]' : u.status==='blocked' ? 'bg-red-900 text-white' : 'bg-yellow-500/20 text-yellow-500'}`}>{u.status}</span>
+            </div>
+            <div className="text-[10px] text-gray-500 courier">Usage: {u.wordsScanned || 0} words</div>
+            <div className="flex gap-2 pt-2 border-t border-[#222]">
+              {u.status === 'pending' && (
+                <button onClick={()=>approveUser(u.email)} className="flex-1 bg-[#00ff88]/20 text-[#00ff88] py-2 rounded text-[9px] uppercase font-bold">Approve</button>
+              )}
+              <button onClick={()=>toggleBlock(u.email, u.status)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase hover:bg-red-900">{u.status === 'blocked' ? 'Unblock' : 'Block'}</button>
+              <button onClick={()=>toggleAccess(u.email, u.access)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase">Tier</button>
+              <button onClick={()=>toggleRole(u.email, u.role)} className="flex-1 border border-[#333] py-2 rounded text-[9px] uppercase">Role</button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -903,22 +932,22 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-black text-[#00ff88] courier">
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-black text-[#00ff88] courier select-none md:select-auto">
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
       
-      <main className="flex-1 overflow-y-auto relative flex flex-col z-10">
+      <main className="flex-1 overflow-y-auto relative flex flex-col z-10 w-full">
         {currentUser && (
-          <div className="md:hidden sticky top-0 flex items-center justify-between p-4 bg-black/90 border-b border-[#00ff88]/20 z-50 backdrop-blur-lg">
-            <h1 className="text-lg orbitron text-[#00ff88] font-bold">GOD MODE</h1>
-            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#00ff88]">
-              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_5px_#00ff88]"></div>
-              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_5px_#00ff88]"></div>
-              <div className="w-6 h-0.5 bg-current shadow-[0_0_5px_#00ff88]"></div>
+          <div className="md:hidden sticky top-0 flex items-center justify-between h-16 px-4 bg-black/90 border-b border-[#00ff88]/20 z-50 backdrop-blur-xl">
+            <h1 className="text-lg orbitron text-[#00ff88] font-bold tracking-tighter">GOD MODE</h1>
+            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-[#00ff88] active:scale-90 transition-transform">
+              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_8px_#00ff88]"></div>
+              <div className="w-6 h-0.5 bg-current mb-1 shadow-[0_0_8px_#00ff88]"></div>
+              <div className="w-6 h-0.5 bg-current shadow-[0_0_8px_#00ff88]"></div>
             </button>
           </div>
         )}
 
-        <div className="p-4 md:p-8 flex-1">
+        <div className="p-4 md:p-8 flex-1 w-full max-w-full overflow-x-hidden">
           {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
             <div className="bg-[#ff3366]/10 border border-[#ff3366]/30 text-[#ff3366] p-4 rounded mb-6 flex justify-between items-center courier text-xs animate-pulse">
               <span>{'>'} WARNING: NO_API_KEYS_DETECTED</span>
