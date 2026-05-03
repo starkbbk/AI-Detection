@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;500;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: #0a0a0f;
+    color: #fff;
+  }
+}
+
+@layer utilities {
+  .orbitron {
+    font-family: 'Orbitron', sans-serif;
+  }
+  
+  .glass {
+    background: rgba(20, 20, 25, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .scan-container {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #00ff88;
+    box-shadow: 0 0 15px #00ff88;
+    animation: scan 2s linear infinite;
+    z-index: 10;
+  }
+}
+
+.animated-border {
+  position: relative;
+  background: #111;
+  border-radius: 0.5rem;
+  z-index: 0;
+}
+
+.animated-border::before {
+  content: "";
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  background: linear-gradient(45deg, #00ff88, #ff3366, #00ff88);
+  z-index: -1;
+  border-radius: 0.6rem;
+  background-size: 200%;
+  animation: glow 3s linear infinite;
+}
+
+@keyframes glow {
+  0% { background-position: 0 0; }
+  50% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.typewriter {
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid #00ff88;
+  animation: blink-caret 0.75s step-end infinite;
+}
+
+@keyframes blink-caret { 
+  from, to { border-color: transparent } 
+  50% { border-color: #00ff88 } 
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #0a0a0f; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #00ff88; }
