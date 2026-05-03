@@ -29,11 +29,22 @@ const callAI = async (systemPrompt, userText, config) => {
   const { model, apiKey, baseUrl, maxTokens = 1000 } = config;
   if (!apiKey) throw new Error("API Key is missing. Please set it in Settings.");
   
-  const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+  // Clean and prepare the base URL
+  let cleanBase = baseUrl.trim().replace(/\/+$/, '');
+  if (!cleanBase.includes('/v1') && !cleanBase.includes('/api')) {
+    cleanBase += '/v1';
+  }
+  
+  const url = `${cleanBase}/chat/completions`;
+  console.log("Calling AI at:", url, "with model:", model);
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": window.location.origin,
+      "X-Title": "AI Detection God Mode"
     },
     body: JSON.stringify({
       model: model,
@@ -45,8 +56,21 @@ const callAI = async (systemPrompt, userText, config) => {
     })
   });
   
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("API Error Response:", errorText);
+    try {
+      const errorJson = JSON.parse(errorText);
+      throw new Error(errorJson.error?.message || errorJson.message || `API Error: ${response.status}`);
+    } catch (e) {
+      if (errorText.includes('<!DOCTYPE html>')) {
+        throw new Error(`Invalid Base URL (${response.status}). Please check Settings and ensure the URL is correct.`);
+      }
+      throw new Error(errorText.substring(0, 100) || `API Error: ${response.status}`);
+    }
+  }
+  
   const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
   return data.choices[0].message.content;
 };
 
