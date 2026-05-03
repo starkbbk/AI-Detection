@@ -85,21 +85,20 @@ const GridBackground = () => {
     let height = canvas.height = window.innerHeight;
     
     const gridSize = 40;
-    const cells = [];
-    const snakes = Array(5).fill(0).map(() => ({
+    const snakes = Array(8).fill(0).map(() => ({
       x: Math.floor(Math.random() * (width / gridSize)),
       y: Math.floor(Math.random() * (height / gridSize)),
-      length: 5 + Math.floor(Math.random() * 5),
+      length: 8 + Math.floor(Math.random() * 10),
       dir: Math.floor(Math.random() * 4),
       trail: []
     }));
 
     const draw = () => {
-      ctx.fillStyle = "#050505";
+      ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, width, height);
       
       // Draw grid
-      ctx.strokeStyle = "rgba(0, 255, 136, 0.05)";
+      ctx.strokeStyle = "rgba(0, 255, 136, 0.08)";
       ctx.lineWidth = 1;
       for(let x = 0; x < width; x += gridSize) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
@@ -125,9 +124,9 @@ const GridBackground = () => {
         if(s.y > height / gridSize) s.y = 0;
 
         s.trail.forEach((t, i) => {
-          const alpha = (i / s.trail.length) * 0.8;
+          const alpha = (i / s.trail.length) * 0.9;
           ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
-          ctx.shadowBlur = 15;
+          ctx.shadowBlur = 20;
           ctx.shadowColor = "#00ff88";
           ctx.fillRect(t.x * gridSize + 2, t.y * gridSize + 2, gridSize - 4, gridSize - 4);
         });
@@ -135,7 +134,7 @@ const GridBackground = () => {
       ctx.shadowBlur = 0;
     };
 
-    const interval = setInterval(draw, 100);
+    const interval = setInterval(draw, 80);
     const handleResize = () => {
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
@@ -815,7 +814,7 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser, isOpen, setIsOpen
         ></div>
       )}
 
-      <div className={`fixed md:static inset-y-0 left-0 w-64 bg-[#0a0a0f] border-r border-[#222] flex flex-col h-full z-50 transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <div className={`fixed md:static inset-y-0 left-0 w-64 bg-black/40 backdrop-blur-xl border-r border-[#00ff88]/20 flex flex-col h-full z-50 transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex justify-between items-center">
           <div>
             <h1 className="text-xl orbitron text-[#00ff88] font-bold">GOD MODE</h1>
@@ -909,7 +908,7 @@ export default function App() {
       
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />}
       
-      <main className="flex-1 overflow-y-auto relative flex flex-col z-10">
+      <main className="flex-1 overflow-y-auto relative flex flex-col z-10 bg-black/10 backdrop-blur-[2px]">
         {currentUser && (
           <div className="md:hidden flex items-center justify-between p-4 bg-black/80 border-b border-[#00ff88]/20 z-30 backdrop-blur-md">
             <h1 className="text-lg orbitron text-[#00ff88] font-bold">GOD MODE</h1>
