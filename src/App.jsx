@@ -41,18 +41,18 @@ const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000)
 };
 
 const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
-  // Extract core model ID (handles "models/gemini-..." or just "gemini-...")
-  const cleanModel = model.includes('/') ? model.split('/').pop() : model;
+  // Robust model ID extraction
+  const cleanModel = model.split('/').pop().trim();
   
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${cleanModel}:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
     });
     const data = await response.json();
-    if (data.error) throw new Error(`[STABLE_V1] ${data.error.message}`);
-    if (!data.candidates || !data.candidates[0]) throw new Error("[STABLE_V1] No response from AI core.");
+    if (data.error) throw new Error(`[${cleanModel}] ${data.error.message}`);
+    if (!data.candidates || !data.candidates[0]) throw new Error(`[${cleanModel}] No response from AI core.`);
     return data.candidates[0].content.parts[0].text;
   } catch (err) {
     throw new Error(`Gemini Core Error: ${err.message}`);
