@@ -219,8 +219,8 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black overflow-hidden p-4">
-      <GridBackground />
+    <div className="fixed inset-0 flex items-center justify-center bg-transparent overflow-hidden p-4">
+      {/* GridBackground is already in App.jsx parent */}
       
       <div className="z-20 w-full max-w-md animate-slide-up">
         <div className="bg-[#1a1a1a]/95 p-10 rounded shadow-2xl border border-white/5">
@@ -885,6 +885,16 @@ export default function App() {
     };
     init();
   }, []);
+
+  // Auto-save config changes
+  useEffect(() => {
+    if (!loadingInit) {
+      const save = async () => {
+        await window.storage.set('config:all', config);
+      };
+      save();
+    }
+  }, [config, loadingInit]);
 
   const handleHumanizeRequest = (text) => {
     setTransferText(text);
