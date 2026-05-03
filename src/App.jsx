@@ -25,53 +25,53 @@ const extractTextFromDOCX = async (file) => {
   return result.value;
 };
 
-const callAI = async (systemPrompt, userText, config) => {
-  const { model, apiKey, baseUrl, maxTokens = 1000 } = config;
-  if (!apiKey) throw new Error("API Key is missing. Please set it in Settings.");
-  
-  // Clean and prepare the base URL
-  let cleanBase = baseUrl.trim().replace(/\/+$/, '');
-  if (!cleanBase.includes('/v1') && !cleanBase.includes('/api')) {
-    cleanBase += '/v1';
-  }
-  
-  const url = `${cleanBase}/chat/completions`;
-  console.log("Calling AI at:", url, "with model:", model);
-
-  const response = await fetch(url, {
+const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000) => {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "AI Detection God Mode"
-    },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: model,
       max_tokens: maxTokens,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText }
-      ]
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
     })
   });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("API Error Response:", errorText);
-    try {
-      const errorJson = JSON.parse(errorText);
-      throw new Error(errorJson.error?.message || errorJson.message || `API Error: ${response.status}`);
-    } catch (e) {
-      if (errorText.includes('<!DOCTYPE html>')) {
-        throw new Error(`Invalid Base URL (${response.status}). Please check Settings and ensure the URL is correct.`);
-      }
-      throw new Error(errorText.substring(0, 100) || `API Error: ${response.status}`);
-    }
-  }
-  
   const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
   return data.choices[0].message.content;
+};
+
+const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: `${systemPrompt}\n\nTEXT:\n${userText}` }] }] })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
+};
+
+const callRouter = async (systemPrompt, userText, apiKey, baseUrl, model, maxTokens = 1000) => {
+  const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: model,
+      max_tokens: maxTokens,
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
+    })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content;
+};
+
+const callAI = async (systemPrompt, userText, config) => {
+  const { provider, model, groqKey, geminiKey, routerKey, routerBase, maxTokens } = config;
+  if (provider === 'gemini') return await callGemini(systemPrompt, userText, geminiKey, model);
+  if (provider === 'router') return await callRouter(systemPrompt, userText, routerKey, routerBase, model, maxTokens);
+  return await callGroq(systemPrompt, userText, groqKey, model, maxTokens);
 };
 
 // -- Components --
@@ -160,7 +160,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
   );
 };
 
-const DetectPage = ({ currentUser, apiKey, baseUrl, model, onHumanizeRequest, initialText = '' }) => {
+const DetectPage = ({ currentUser, config, onHumanizeRequest, initialText = '' }) => {
   const [text, setText] = useState(initialText);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -191,10 +191,13 @@ const DetectPage = ({ currentUser, apiKey, baseUrl, model, onHumanizeRequest, in
     if (!text.trim()) return setError("Please enter text or upload a file.");
     const words = getWordCount(text);
     if (currentUser.role === 'user' && words > 5000) {
-      return setError("Word limit exceeded (5000). Please upgrade to Admin/Pro.");
+      return setError("Word limit exceeded (5000). Please upgrade.");
     }
     
-    if (!apiKey) return setError("API Key not set. Please go to Settings.");
+    const { provider, groqKey, geminiKey, routerKey } = config;
+    if (provider === 'groq' && !groqKey) return setError("Groq Key missing.");
+    if (provider === 'gemini' && !geminiKey) return setError("Gemini Key missing.");
+    if (provider === 'router' && !routerKey) return setError("Router Key missing.");
 
     setLoading(true);
     const systemPrompt = `You are an expert AI content detector. Analyze the text and return ONLY a JSON object:
@@ -212,7 +215,7 @@ const DetectPage = ({ currentUser, apiKey, baseUrl, model, onHumanizeRequest, in
 Return ONLY the JSON. No markdown. No explanation.`;
 
     try {
-      const res = await callAI(systemPrompt, text, { model, apiKey, baseUrl, maxTokens: 1000 });
+      const res = await callAI(systemPrompt, text, { ...config, maxTokens: 1000 });
       const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
       const data = JSON.parse(raw);
       setResult(data);
@@ -305,7 +308,7 @@ Return ONLY the JSON. No markdown. No explanation.`;
   );
 };
 
-const HumanizePage = ({ currentUser, apiKey, baseUrl, model, initialText = '', onDetectRequest }) => {
+const HumanizePage = ({ currentUser, config, initialText = '', onDetectRequest }) => {
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
@@ -320,7 +323,10 @@ const HumanizePage = ({ currentUser, apiKey, baseUrl, model, initialText = '', o
       return setError("Word limit exceeded (5000). Please upgrade.");
     }
     
-    if (!apiKey) return setError("API Key not set. Please go to Settings.");
+    const { provider, groqKey, geminiKey, routerKey } = config;
+    if (provider === 'groq' && !groqKey) return setError("Groq Key missing.");
+    if (provider === 'gemini' && !geminiKey) return setError("Gemini Key missing.");
+    if (provider === 'router' && !routerKey) return setError("Router Key missing.");
 
     setLoading(true);
     const systemPrompt = `You are an expert text humanizer. Rewrite the given text to sound 100% human-written.
@@ -333,7 +339,7 @@ Rules:
 - Output ONLY the rewritten text. No explanations. No preamble.`;
 
     try {
-      const res = await callAI(systemPrompt, text, { model, apiKey, baseUrl, maxTokens: 4000 });
+      const res = await callAI(systemPrompt, text, { ...config, maxTokens: 4000 });
       setResult(res.trim());
       await window.storage.set(`history:${currentUser.email}:${Date.now()}`, {
         type: 'humanize',
@@ -547,8 +553,10 @@ const AdminPage = () => {
   );
 };
 
-const SettingsPage = ({ apiKey, setApiKey, baseUrl, setBaseUrl, model, setModel, isAdmin, currentUser, setCurrentUser }) => {
-  const [showKey, setShowKey] = useState(false);
+const SettingsPage = ({ config, setConfig, isAdmin, currentUser, setCurrentUser }) => {
+  const [showGroq, setShowGroq] = useState(false);
+  const [showGemini, setShowGemini] = useState(false);
+  const [showRouter, setShowRouter] = useState(false);
   const [saved, setSaved] = useState(false);
   
   const [oldPassword, setOldPassword] = useState('');
@@ -559,9 +567,7 @@ const SettingsPage = ({ apiKey, setApiKey, baseUrl, setBaseUrl, model, setModel,
 
   const saveGlobal = async () => {
     if(isAdmin) {
-      await window.storage.set('config:routerKey', apiKey);
-      await window.storage.set('config:routerBase', baseUrl);
-      await window.storage.set('config:model', model);
+      await window.storage.set('config:all', config);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
@@ -570,52 +576,71 @@ const SettingsPage = ({ apiKey, setApiKey, baseUrl, setBaseUrl, model, setModel,
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto">
       <h2 className="text-2xl orbitron text-[#00ff88]">Settings</h2>
+      
       <div className="glass p-6 rounded-lg flex flex-col gap-4">
+        <h3 className="orbitron text-[#00ff88] border-b border-[#333] pb-2">AI Provider Selection</h3>
+        <select 
+          value={config.provider} 
+          onChange={e => setConfig({...config, provider: e.target.value})}
+          className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
+        >
+          <option value="groq">Groq (Llama Models - Fast)</option>
+          <option value="gemini">Google Gemini (Best for Large Texts)</option>
+          <option value="router">Unified Router (AgentRouter/OneAPI)</option>
+        </select>
+        
         <div>
-          <label className="block text-gray-400 mb-2">AgentRouter / OneAPI Base URL</label>
+          <label className="block text-gray-400 mb-1 text-sm">Active Model ID</label>
           <input 
             type="text" 
-            value={baseUrl} 
-            onChange={e => setBaseUrl(e.target.value)}
+            value={config.model} 
+            onChange={e => setConfig({...config, model: e.target.value})}
             className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-            placeholder="https://agentrouter.org/v1"
+            placeholder="e.g. gemini-1.5-flash or llama-3.3-70b-versatile"
           />
         </div>
 
-        <div>
-          <label className="block text-gray-400 mb-2">Router API Key</label>
-          <div className="flex gap-2">
-            <input 
-              type={showKey ? "text" : "password"} 
-              value={apiKey} 
-              onChange={e => setApiKey(e.target.value)}
-              className="flex-1 bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-              placeholder="sk-..."
-            />
-            <button onClick={() => setShowKey(!showKey)} className="bg-[#222] px-4 rounded border border-[#333] hover:bg-[#333]">👁</button>
+        <div className="mt-4 flex flex-col gap-6">
+          {/* Groq */}
+          <div className={`p-4 border rounded ${config.provider === 'groq' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+            <label className="block text-sm text-gray-400 mb-2">Groq API Key</label>
+            <div className="flex gap-2">
+              <input type={showGroq ? "text" : "password"} value={config.groqKey} onChange={e => setConfig({...config, groqKey: e.target.value})}
+                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+              <button onClick={() => setShowGroq(!showGroq)} className="px-2">👁</button>
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-gray-400 mb-2">Model Name</label>
-          <input 
-            type="text" 
-            value={model} 
-            onChange={e => setModel(e.target.value)}
-            className="w-full bg-[#111] border border-[#333] p-3 rounded focus:outline-none focus:border-[#00ff88] text-white"
-            placeholder="gemini-1.5-flash or llama-3.3-70b-versatile"
-          />
-          <p className="text-xs text-gray-500 mt-2">Enter the exact model ID from your router dashboard.</p>
+          {/* Gemini */}
+          <div className={`p-4 border rounded ${config.provider === 'gemini' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+            <label className="block text-sm text-gray-400 mb-2">Gemini API Key</label>
+            <div className="flex gap-2">
+              <input type={showGemini ? "text" : "password"} value={config.geminiKey} onChange={e => setConfig({...config, geminiKey: e.target.value})}
+                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+              <button onClick={() => setShowGemini(!showGemini)} className="px-2">👁</button>
+            </div>
+          </div>
+
+          {/* Router */}
+          <div className={`p-4 border rounded ${config.provider === 'router' ? 'border-[#00ff88] bg-[#00ff88]/5' : 'border-[#333]'}`}>
+            <label className="block text-sm text-gray-400 mb-1">Router Base URL</label>
+            <input type="text" value={config.routerBase} onChange={e => setConfig({...config, routerBase: e.target.value})}
+              className="w-full bg-[#0a0a0f] border border-[#333] p-2 rounded text-white mb-3" placeholder="https://agentrouter.org/v1" />
+            <label className="block text-sm text-gray-400 mb-1">Router API Key</label>
+            <div className="flex gap-2">
+              <input type={showRouter ? "text" : "password"} value={config.routerKey} onChange={e => setConfig({...config, routerKey: e.target.value})}
+                className="flex-1 bg-[#0a0a0f] border border-[#333] p-2 rounded text-white" />
+              <button onClick={() => setShowRouter(!showRouter)} className="px-2">👁</button>
+            </div>
+          </div>
         </div>
 
         {isAdmin && (
-          <div className="mt-4 pt-4 border-t border-[#333]">
-            <h3 className="text-lg text-[#ff3366] mb-2 orbitron">Admin Controls</h3>
-            <button onClick={saveGlobal} className="bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-2 px-4 rounded hover:bg-[#ff3366] hover:text-white transition">
-              {saved ? 'Saved!' : 'Save Settings as Default for all users'}
-            </button>
-          </div>
+          <button onClick={saveGlobal} className="mt-4 bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366] py-3 rounded hover:bg-[#ff3366] hover:text-white transition">
+            {saved ? 'Saved Successfully!' : 'Save as Default for All Users'}
+          </button>
         )}
+      </div>
 
         <div className="mt-6 pt-6 border-t border-[#333]">
           <h3 className="text-xl orbitron text-[#00ff88] mb-4">Change Password</h3>
@@ -700,9 +725,14 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser }) => {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [page, setPage] = useState('login');
-  const [routerApiKey, setRouterApiKey] = useState('');
-  const [routerBaseUrl, setRouterBaseUrl] = useState('https://agentrouter.org/v1');
-  const [model, setModel] = useState('gemini-1.5-flash');
+  const [config, setConfig] = useState({
+    provider: 'gemini',
+    model: 'gemini-1.5-flash',
+    groqKey: '',
+    geminiKey: '',
+    routerKey: '',
+    routerBase: 'https://agentrouter.org/v1'
+  });
   const [loadingInit, setLoadingInit] = useState(true);
   const [transferText, setTransferText] = useState('');
 
@@ -716,12 +746,8 @@ export default function App() {
     document.head.appendChild(script);
 
     const init = async () => {
-      const rKey = await window.storage.get('config:routerKey');
-      if (rKey) setRouterApiKey(rKey.value);
-      const rBase = await window.storage.get('config:routerBase');
-      if (rBase) setRouterBaseUrl(rBase.value);
-      const rModel = await window.storage.get('config:model');
-      if (rModel) setModel(rModel.value);
+      const saved = await window.storage.get('config:all');
+      if (saved) setConfig(saved.value);
       setLoadingInit(false);
     };
     init();
@@ -747,20 +773,20 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">
       {currentUser && <Sidebar page={page} setPage={setPage} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       <main className="flex-1 overflow-y-auto p-8 relative">
-        {!routerApiKey && currentUser && page !== 'settings' && (
+        {(!config.groqKey && !config.geminiKey && !config.routerKey) && currentUser && page !== 'settings' && (
           <div className="bg-[#ff3366]/20 border border-[#ff3366] text-[#ff3366] p-4 rounded-lg mb-6 flex justify-between items-center">
-            <span>⚠️ API Router is not configured. Scans will fail.</span>
+            <span>⚠️ No API Keys configured. Scans will fail.</span>
             <button onClick={() => setPage('settings')} className="bg-[#ff3366] text-white px-4 py-1 rounded text-sm hover:bg-red-600">Configure</button>
           </div>
         )}
         
         {page === 'login' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={true} />}
         {page === 'signup' && <AuthPage setPage={setPage} setCurrentUser={setCurrentUser} isLogin={false} />}
-        {page === 'detect' && <DetectPage currentUser={currentUser} apiKey={routerApiKey} baseUrl={routerBaseUrl} model={model} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
-        {page === 'humanize' && <HumanizePage currentUser={currentUser} apiKey={routerApiKey} baseUrl={routerBaseUrl} model={model} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
+        {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
+        {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
         {page === 'history' && <HistoryPage currentUser={currentUser} />}
         {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
-        {page === 'settings' && <SettingsPage apiKey={routerApiKey} setApiKey={setRouterApiKey} baseUrl={routerBaseUrl} setBaseUrl={setRouterBaseUrl} model={model} setModel={setModel} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+        {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
       </main>
     </div>
   );
