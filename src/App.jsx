@@ -101,6 +101,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [adminCode, setAdminCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -127,8 +128,10 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
         if (exists) throw new Error("ID_RESERVED");
         if (password.length < 6) throw new Error("KEY_LENGTH_MIN_6");
         
-        const role = userKeys.length === 0 ? 'admin' : 'user';
+        // Only grant admin if secret code matches
+        const role = adminCode === 'GODMODE_ADMIN' ? 'admin' : 'user';
         const status = role === 'admin' ? 'approved' : 'pending';
+        
         const newUser = { email, password, role, status, wordsScanned: 0 };
         await window.storage.set(`users:${email}`, newUser);
         
@@ -137,7 +140,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
           setPage('detect');
         } else {
           setError("INIT_SUCCESS_AWAIT_LINK");
-          setEmail(''); setPassword('');
+          setEmail(''); setPassword(''); setAdminCode('');
         }
       }
     } catch (e) {
@@ -184,6 +187,19 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
                 placeholder="********"
               />
             </div>
+
+            {!isLogin && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-500 courier ml-1 uppercase tracking-widest">Admin Access Code (Optional)</label>
+                <input 
+                  type="password" 
+                  value={adminCode} 
+                  onChange={e => setAdminCode(e.target.value)}
+                  className="w-full bg-[#2a2a2a] border-none p-4 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#00ff88]/50 transition-all"
+                  placeholder="Leave empty for basic user"
+                />
+              </div>
+            )}
 
             <div className="flex justify-between items-center text-[10px] courier text-gray-500 uppercase tracking-widest px-1">
               <span className="hover:text-white cursor-pointer transition">Forgot Password</span>
