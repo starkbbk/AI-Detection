@@ -26,18 +26,24 @@ const extractTextFromDOCX = async (file) => {
 };
 
 const callGroq = async (systemPrompt, userText, apiKey, model, maxTokens = 1000) => {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: maxTokens,
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
-    })
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content;
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: maxTokens,
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.choices[0].message.content;
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message === 'Load failed') 
+      throw new Error("NETWORK_BLOCKED: Disable Ad-blockers (ABP/uBlock) or try Chrome.");
+    throw err;
+  }
 };
 
 const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-flash') => {
@@ -68,22 +74,28 @@ const callGemini = async (systemPrompt, userText, apiKey, model = 'gemini-1.5-fl
     }
   }
 
-  throw new Error(`CRITICAL_CORE_FAILURE: ${lastError}. \n\nTroubleshoot:\n1. Check if 'Generative Language API' is ENABLED in Google AI Studio.\n2. Ensure your API Key is valid and has no spaces.\n3. Try switching to 'Groq' in Settings if Gemini persists in failing.`);
+  throw new Error(`CRITICAL_CORE_FAILURE: ${lastError}. \n\nTroubleshoot:\n1. DISABLE Ad-blockers (ABP/uBlock) for this site.\n2. Ensure 'Generative Language API' is ENABLED in Google AI Studio.\n3. Try switching to 'Groq' if Gemini continues to fail.`);
 };
 
 const callNvidia = async (systemPrompt, userText, apiKey, model, maxTokens = 1000) => {
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: maxTokens,
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
-    })
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content;
+  try {
+    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: maxTokens,
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userText }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    return data.choices[0].message.content;
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message === 'Load failed') 
+      throw new Error("NETWORK_BLOCKED: Disable Ad-blockers (ABP/uBlock) or try Chrome.");
+    throw err;
+  }
 };
 
 const callRouter = async (systemPrompt, userText, apiKey, baseUrl, model, maxTokens = 1000) => {
@@ -295,9 +307,10 @@ const DetectPage = ({ currentUser, config, onHumanizeRequest, initialText = '' }
       return setError(`Word limit exceeded for your tier (${limit}). Contact admin for full access.`);
     }
     
-    const { provider, groqKey, geminiKey, routerKey } = config;
+    const { provider, groqKey, geminiKey, nvidiaKey, routerKey } = config;
     if (provider === 'groq' && !groqKey) return setError("Groq Key missing.");
     if (provider === 'gemini' && !geminiKey) return setError("Gemini Key missing.");
+    if (provider === 'nvidia' && !nvidiaKey) return setError("NVIDIA Key missing.");
     if (provider === 'router' && !routerKey) return setError("Router Key missing.");
 
     setLoading(true);
@@ -425,9 +438,10 @@ const HumanizePage = ({ currentUser, config, initialText = '', onDetectRequest }
       return setError(`Word limit exceeded for your tier (${limit}). Contact admin for full access.`);
     }
     
-    const { provider, groqKey, geminiKey, routerKey } = config;
+    const { provider, groqKey, geminiKey, nvidiaKey, routerKey } = config;
     if (provider === 'groq' && !groqKey) return setError("Groq Key missing.");
     if (provider === 'gemini' && !geminiKey) return setError("Gemini Key missing.");
+    if (provider === 'nvidia' && !nvidiaKey) return setError("NVIDIA Key missing.");
     if (provider === 'router' && !routerKey) return setError("Router Key missing.");
 
     setLoading(true);
