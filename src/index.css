@@ -32,8 +32,8 @@
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 3px;
-    background: #00ff88;
-    box-shadow: 0 0 15px #00ff88;
+    background: #ff8c00;
+    box-shadow: 0 0 15px #ff8c00;
     animation: scan 2s linear infinite;
     z-index: 10;
   }
@@ -50,7 +50,7 @@
   content: "";
   position: absolute;
   top: -2px; left: -2px; right: -2px; bottom: -2px;
-  background: linear-gradient(45deg, #00ff88, #ff3366, #00ff88);
+  background: linear-gradient(45deg, #ff8c00, #ffa500, #ff4500);
   z-index: -1;
   border-radius: 0.6rem;
   background-size: 200%;
@@ -73,16 +73,16 @@
 .typewriter {
   overflow: hidden;
   white-space: nowrap;
-  border-right: 2px solid #00ff88;
+  border-right: 2px solid #ff8c00;
   animation: blink-caret 0.75s step-end infinite;
 }
 
 @keyframes blink-caret { 
   from, to { border-color: transparent } 
-  50% { border-color: #00ff88 } 
+  50% { border-color: #ff8c00 } 
 }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #0a0a0f; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #00ff88; }
+::-webkit-scrollbar-thumb:hover { background: #ff8c00; }
