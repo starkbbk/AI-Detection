@@ -240,8 +240,11 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
     
     try {
       // -- MASTER ADMIN BYPASS (Works on all browsers) --
-      if (email.toLowerCase() === 'stark@godmode.com' && password === 'Stark@1234') {
-        const masterAdmin = { email: 'stark@godmode.com', password: 'Stark@1234', role: 'admin', status: 'approved', access: 'full', wordsScanned: 0 };
+      const masterEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      const masterPass = import.meta.env.VITE_ADMIN_PASSWORD;
+
+      if (masterEmail && masterPass && email.toLowerCase() === masterEmail.toLowerCase() && password === masterPass) {
+        const masterAdmin = { email: masterEmail, password: masterPass, role: 'admin', status: 'approved', access: 'full', wordsScanned: 0 };
         // Sync to local storage if not present so history works
         const existing = await window.storage.get(`users:${email.toLowerCase()}`);
         if (!existing) await window.storage.set(`users:${email.toLowerCase()}`, masterAdmin);
