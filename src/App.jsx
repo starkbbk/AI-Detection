@@ -658,47 +658,42 @@ const AdvancedPage = ({ currentUser, config }) => {
 
   const runDetect = async () => {
     if (!detectText.trim()) return setDetectError('Please enter text to detect.');
+    if (detectText.length < 50) return setDetectError('Text too short for accurate detection (min 50 chars).');
+    
     setDetectLoading(true); setDetectResult(null); setDetectError('');
     
-    let lastError = '';
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      setDetectProgress(attempt > 1 ? `🔄 Retry Attempt ${attempt}/3...` : '⏳ Analyzing with decopy.ai ML model...');
-      try {
-        const output = await decopyDetect(detectText);
-        setDetectResult(output);
-        setDetectProgress('');
-        setDetectLoading(false);
-        return; // Success
-      } catch (e) {
-        lastError = e.message;
-        console.warn(`Attempt ${attempt} failed:`, e);
-        if (!e.message.includes('DECOPY_LIMIT') && !e.message.includes('quota')) break;
-        await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
-      }
+    // Try Decopy first
+    setDetectProgress('⏳ Connecting to Decopy.ai ML model...');
+    try {
+      const output = await decopyDetect(detectText);
+      setDetectResult(output);
+      setDetectProgress('');
+      setDetectLoading(false);
+      return;
+    } catch (e) {
+      console.warn('Decopy Blocked:', e);
     }
 
-    // If all retries failed, try Fallback
+    // Fallback to God Mode AI Engine
     if (config.geminiKey || config.groqKey || config.nvidiaKey || config.routerKey) {
-      setDetectProgress('⚠️ Decopy Limit Reached. Using Internal AI Fallback...');
+      setDetectProgress('🚀 Decopy Busy. Activating God Mode AI Engine...');
       try {
-        const systemPrompt = `Analyze the text for AI content. Return ONLY a JSON: {"score": <0-1.0 float>, "sentences": [{"content": "...", "score": <0-1.0>}], "language": "en"}`;
-        const res = await callAI(systemPrompt, detectText, { ...config, maxTokens: 1000 });
+        const systemPrompt = `Analyze for AI content. Return JSON ONLY: {"score": <0.0-1.0>, "sentences": [{"content": "...", "score": <0.0-1.0>}], "verdict": "...", "confidence": <0.0-1.0>}`;
+        const res = await callAI(systemPrompt, `Analyze this text for AI probability: "${detectText}"`, { ...config, maxTokens: 2000 });
         const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
         const data = JSON.parse(raw);
         setDetectResult({
-          score: data.score || (data.ai_percentage / 100) || 0,
+          score: data.score || 0,
           sentences: data.sentences || [],
-          language: data.language || 'en',
-          isFallback: true
+          language: 'en',
+          isGodMode: true
         });
-        setDetectProgress('✅ Analysis Complete (via Internal Fallback)');
+        setDetectProgress('✅ Deep Analysis Complete (via God Mode Engine)');
       } catch (innerE) {
-        setDetectError("Both Decopy and Internal AI failed: " + innerE.message);
-        setDetectProgress('');
+        setDetectError("Engine Error: " + innerE.message);
       }
     } else {
-      setDetectError(lastError + " (Set an API Key in Settings for automatic fallback)");
-      setDetectProgress('');
+      setDetectError("Decopy Quota Full. Please add a Gemini/Groq Key in Settings to activate the 'God Mode' AI Engine backup.");
     }
     setDetectLoading(false);
   };
@@ -731,7 +726,7 @@ const AdvancedPage = ({ currentUser, config }) => {
         <div className="flex items-center gap-2">
           <span className="text-xl md:text-2xl orbitron text-[#ff8c00]">Advanced Mode</span>
           <span className="text-[10px] courier text-gray-500 border border-[#333] rounded px-2 py-0.5 uppercase">
-            {detectResult?.isFallback ? 'Internal AI Fallback' : 'Powered by decopy.ai'}
+            {detectResult?.isGodMode ? 'God Mode AI Engine' : 'Powered by decopy.ai'}
           </span>
         </div>
       </div>
