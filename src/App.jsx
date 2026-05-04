@@ -23,6 +23,13 @@ const decopyDetect = async (text) => {
       'Authorization': '',
       'Origin': 'https://decopy.ai',
       'Referer': 'https://decopy.ai/ai-detector/',
+      'Accept': 'application/json, text/plain, */*',
+      'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"macOS"',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-site',
     },
     body,
   });
@@ -649,8 +656,29 @@ const AdvancedPage = ({ currentUser, config }) => {
       setDetectResult(output);
       setDetectProgress('');
     } catch (e) {
-      setDetectError(e.message);
-      setDetectProgress('');
+      console.warn('Decopy Error:', e);
+      if (config.geminiKey || config.groqKey || config.nvidiaKey || config.routerKey) {
+        setDetectProgress('⚠️ Decopy Limit Reached. Using Internal AI Fallback...');
+        try {
+          const systemPrompt = `Analyze the text for AI content. Return ONLY a JSON: {"score": <0-1.0 float>, "sentences": [{"content": "...", "score": <0-1.0>}], "language": "en"}`;
+          const res = await callAI(systemPrompt, detectText, { ...config, maxTokens: 1000 });
+          const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
+          const data = JSON.parse(raw);
+          setDetectResult({
+            score: data.score || (data.ai_percentage / 100) || 0,
+            sentences: data.sentences || [],
+            language: data.language || 'en',
+            isFallback: true
+          });
+          setDetectProgress('✅ Analysis Complete (via Internal Fallback)');
+        } catch (innerE) {
+          setDetectError("Both Decopy and Internal AI failed: " + innerE.message);
+          setDetectProgress('');
+        }
+      } else {
+        setDetectError(e.message + " (Set an API Key in Settings for automatic fallback)");
+        setDetectProgress('');
+      }
     }
     setDetectLoading(false);
   };
@@ -682,7 +710,9 @@ const AdvancedPage = ({ currentUser, config }) => {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xl md:text-2xl orbitron text-[#ff8c00]">Advanced Mode</span>
-          <span className="text-[10px] courier text-gray-500 border border-[#333] rounded px-2 py-0.5 uppercase">Powered by decopy.ai</span>
+          <span className="text-[10px] courier text-gray-500 border border-[#333] rounded px-2 py-0.5 uppercase">
+            {detectResult?.isFallback ? 'Internal AI Fallback' : 'Powered by decopy.ai'}
+          </span>
         </div>
       </div>
 
