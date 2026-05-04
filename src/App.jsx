@@ -6,15 +6,10 @@ import { Shield, User, History as HistoryIcon, Settings, Wand2, Upload, LogOut, 
 // -- Decopy.ai API (Advanced Mode) --
 const DECOPY_API = 'https://api.decopy.ai';
 const getDeviceSerial = () => {
-  let serial = localStorage.getItem('_decopy_serial');
-  if (!serial) {
-    serial = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
-    localStorage.setItem('_decopy_serial', serial);
-  }
-  return serial;
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 };
 
 const decopyDetect = async (text) => {
@@ -32,7 +27,7 @@ const decopyDetect = async (text) => {
     body,
   });
   const data = await res.json();
-  if (data.code !== 100000) throw new Error("DECOPY_QUOTA_EXCEEDED: Decopy.ai has limited guest scans. Try again later or use Standard Mode.");
+  if (data.code !== 100000) throw new Error("DECOPY_LIMIT: Daily guest quota reached. Click 'Scan' again (New ID generated) or use Standard Mode.");
   const jobId = data.result.job_id;
   
   for (let i = 0; i < 20; i++) {
@@ -352,7 +347,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
             <button 
               onClick={handleSubmit} 
               disabled={loading}
-              className="w-full bg-[#ffa500] text-black font-bold py-4 rounded orbitron hover:bg-[#ff8c00] shadow-[0_0_20px_rgba(0,255,0,0.3)] hover:shadow-[0_0_30px_rgba(0,255,136,0.5)] transition-all active:scale-95 uppercase tracking-widest"
+              className="w-full bg-[#ffa500] text-black font-bold py-4 rounded orbitron hover:bg-[#ff8c00] shadow-[0_0_20px_rgba(255,165,0,0.3)] hover:shadow-[0_0_30px_rgba(255,140,0,0.5)] transition-all active:scale-95 uppercase tracking-widest"
             >
               {loading ? 'WAITING...' : (isLogin ? 'Login' : 'Initialize')}
             </button>
@@ -697,7 +692,7 @@ const AdvancedPage = ({ currentUser, config }) => {
           onClick={() => setActiveTab('detect')}
           className={`px-4 py-2 rounded text-xs orbitron uppercase tracking-widest transition-all ${
             activeTab === 'detect'
-              ? 'bg-[#ff8c00] text-black font-bold shadow-[0_0_15px_rgba(0,255,136,0.4)]'
+              ? 'bg-[#ff8c00] text-black font-bold shadow-[0_0_15px_rgba(255,140,0,0.4)]'
               : 'text-gray-400 hover:text-white'
           }`}
         >
@@ -707,7 +702,7 @@ const AdvancedPage = ({ currentUser, config }) => {
           onClick={() => setActiveTab('humanize')}
           className={`px-4 py-2 rounded text-xs orbitron uppercase tracking-widest transition-all ${
             activeTab === 'humanize'
-              ? 'bg-[#ff8c00] text-black font-bold shadow-[0_0_15px_rgba(0,255,136,0.4)]'
+              ? 'bg-[#ff8c00] text-black font-bold shadow-[0_0_15px_rgba(255,140,0,0.4)]'
               : 'text-gray-400 hover:text-white'
           }`}
         >
