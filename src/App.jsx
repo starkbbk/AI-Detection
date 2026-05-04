@@ -4,8 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Shield, User, History as HistoryIcon, Settings, Wand2, Upload, LogOut, Copy, Check } from 'lucide-react';
 
 // -- Decopy.ai API (Advanced Mode) --
-const PROXY_URL = 'https://corsproxy.io/?';
-const DECOPY_BASE = 'https://api.decopy.ai';
+const DECOPY_PROXY = '/api/decopy?path=';
 const getDeviceSerial = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
@@ -16,7 +15,7 @@ const getDeviceSerial = () => {
 const decopyDetect = async (text) => {
   const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2, 18);
   const body = `--${boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n${text}\r\n--${boundary}--\r\n`;
-  const res = await fetch(`${PROXY_URL}${encodeURIComponent(`${DECOPY_BASE}/api/decopy/ai-detector/create-job`)}`, {
+  const res = await fetch(`${DECOPY_PROXY}${encodeURIComponent('/api/decopy/ai-detector/create-job')}`, {
     method: 'POST',
     headers: {
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
@@ -40,7 +39,7 @@ const decopyDetect = async (text) => {
   
   for (let i = 0; i < 20; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    const pollRes = await fetch(`${PROXY_URL}${encodeURIComponent(`${DECOPY_BASE}/api/decopy/ai-detector/get-job/${jobId}`)}`, {
+    const pollRes = await fetch(`${DECOPY_PROXY}${encodeURIComponent(`/api/decopy/ai-detector/get-job/${jobId}`)}`, {
       headers: { 
         'Product-Serial': getDeviceSerial(), 
         'Authorization': '', 
@@ -58,7 +57,7 @@ const decopyDetect = async (text) => {
 
 const decopyHumanize = async (text, { length = 'standard', tone = 'normal', purpose = 'general_writing' } = {}) => {
   const params = new URLSearchParams({ entertext: text, length, tone, purpose, language: 'en', model: 'basic' });
-  const res = await fetch(`${PROXY_URL}${encodeURIComponent(`${DECOPY_BASE}/api/decopy/ai-humanizer/create-job`)}`, {
+  const res = await fetch(`${DECOPY_PROXY}${encodeURIComponent('/api/decopy/ai-humanizer/create-job')}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -75,7 +74,7 @@ const decopyHumanize = async (text, { length = 'standard', tone = 'normal', purp
   
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 3000));
-    const pollRes = await fetch(`${PROXY_URL}${encodeURIComponent(`${DECOPY_BASE}/api/decopy/ai-humanizer/get-job/${jobId}`)}`, {
+    const pollRes = await fetch(`${DECOPY_PROXY}${encodeURIComponent(`/api/decopy/ai-humanizer/get-job/${jobId}`)}`, {
       headers: { 
         'Product-Serial': getDeviceSerial(), 
         'Authorization': '', 
