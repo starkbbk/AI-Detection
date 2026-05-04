@@ -680,8 +680,9 @@ const AdvancedPage = ({ currentUser, config }) => {
       try {
         const systemPrompt = `Analyze for AI content. Return JSON ONLY: {"score": <0.0-1.0>, "sentences": [{"content": "...", "score": <0.0-1.0>}], "verdict": "...", "confidence": <0.0-1.0>}`;
         const res = await callAI(systemPrompt, `Analyze this text for AI probability: "${detectText}"`, { ...config, maxTokens: 2000 });
-        const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
-        const data = JSON.parse(raw);
+        const jsonMatch = res.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("AI returned invalid data format.");
+        const data = JSON.parse(jsonMatch[0]);
         setDetectResult({
           score: data.score || 0,
           sentences: data.sentences || [],
