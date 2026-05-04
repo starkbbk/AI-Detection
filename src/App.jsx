@@ -659,36 +659,46 @@ const AdvancedPage = ({ currentUser, config }) => {
   const runDetect = async () => {
     if (!detectText.trim()) return setDetectError('Please enter text to detect.');
     setDetectLoading(true); setDetectResult(null); setDetectError('');
-    setDetectProgress('🔍 Sending to decopy.ai...');
-    try {
-      setDetectProgress('⏳ Analyzing with decopy.ai ML model...');
-      const output = await decopyDetect(detectText);
-      setDetectResult(output);
-      setDetectProgress('');
-    } catch (e) {
-      console.warn('Decopy Error:', e);
-      if (config.geminiKey || config.groqKey || config.nvidiaKey || config.routerKey) {
-        setDetectProgress('⚠️ Decopy Limit Reached. Using Internal AI Fallback...');
-        try {
-          const systemPrompt = `Analyze the text for AI content. Return ONLY a JSON: {"score": <0-1.0 float>, "sentences": [{"content": "...", "score": <0-1.0>}], "language": "en"}`;
-          const res = await callAI(systemPrompt, detectText, { ...config, maxTokens: 1000 });
-          const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
-          const data = JSON.parse(raw);
-          setDetectResult({
-            score: data.score || (data.ai_percentage / 100) || 0,
-            sentences: data.sentences || [],
-            language: data.language || 'en',
-            isFallback: true
-          });
-          setDetectProgress('✅ Analysis Complete (via Internal Fallback)');
-        } catch (innerE) {
-          setDetectError("Both Decopy and Internal AI failed: " + innerE.message);
-          setDetectProgress('');
-        }
-      } else {
-        setDetectError(e.message + " (Set an API Key in Settings for automatic fallback)");
+    
+    let lastError = '';
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      setDetectProgress(attempt > 1 ? `🔄 Retry Attempt ${attempt}/3...` : '⏳ Analyzing with decopy.ai ML model...');
+      try {
+        const output = await decopyDetect(detectText);
+        setDetectResult(output);
+        setDetectProgress('');
+        setDetectLoading(false);
+        return; // Success
+      } catch (e) {
+        lastError = e.message;
+        console.warn(`Attempt ${attempt} failed:`, e);
+        if (!e.message.includes('DECOPY_LIMIT') && !e.message.includes('quota')) break;
+        await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+      }
+    }
+
+    // If all retries failed, try Fallback
+    if (config.geminiKey || config.groqKey || config.nvidiaKey || config.routerKey) {
+      setDetectProgress('⚠️ Decopy Limit Reached. Using Internal AI Fallback...');
+      try {
+        const systemPrompt = `Analyze the text for AI content. Return ONLY a JSON: {"score": <0-1.0 float>, "sentences": [{"content": "...", "score": <0-1.0>}], "language": "en"}`;
+        const res = await callAI(systemPrompt, detectText, { ...config, maxTokens: 1000 });
+        const raw = res.replace(/```json/gi, '').replace(/```/gi, '').trim();
+        const data = JSON.parse(raw);
+        setDetectResult({
+          score: data.score || (data.ai_percentage / 100) || 0,
+          sentences: data.sentences || [],
+          language: data.language || 'en',
+          isFallback: true
+        });
+        setDetectProgress('✅ Analysis Complete (via Internal Fallback)');
+      } catch (innerE) {
+        setDetectError("Both Decopy and Internal AI failed: " + innerE.message);
         setDetectProgress('');
       }
+    } else {
+      setDetectError(lastError + " (Set an API Key in Settings for automatic fallback)");
+      setDetectProgress('');
     }
     setDetectLoading(false);
   };
