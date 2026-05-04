@@ -3,6 +3,81 @@ import mammoth from 'mammoth';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Shield, User, History as HistoryIcon, Settings, Wand2, Upload, LogOut, Copy, Check } from 'lucide-react';
 
+// -- Decopy.ai API (Advanced Mode) --
+const DECOPY_API = 'https://api.decopy.ai';
+const getDeviceSerial = () => {
+  let serial = localStorage.getItem('_decopy_serial');
+  if (!serial) {
+    serial = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+    localStorage.setItem('_decopy_serial', serial);
+  }
+  return serial;
+};
+
+const decopyDetect = async (text) => {
+  const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2, 18);
+  const body = `--${boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n${text}\r\n--${boundary}--\r\n`;
+  const res = await fetch(`${DECOPY_API}/api/decopy/ai-detector/create-job`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Product-Serial': getDeviceSerial(),
+      'Authorization': '',
+      'Origin': 'https://decopy.ai',
+      'Referer': 'https://decopy.ai/ai-detector/',
+    },
+    body,
+  });
+  const data = await res.json();
+  if (data.code !== 100000) throw new Error(data.message?.en || 'Detection failed');
+  const jobId = data.result.job_id;
+  
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const pollRes = await fetch(`${DECOPY_API}/api/decopy/ai-detector/get-job/${jobId}`, {
+      headers: { 'Product-Serial': getDeviceSerial(), 'Authorization': '', 'Origin': 'https://decopy.ai' },
+    });
+    const pollData = await pollRes.json();
+    if (pollData.code === 100000 && pollData.result?.output) {
+      return pollData.result.output;
+    }
+  }
+  throw new Error('Detection timed out');
+};
+
+const decopyHumanize = async (text, { length = 'standard', tone = 'normal', purpose = 'general_writing' } = {}) => {
+  const params = new URLSearchParams({ entertext: text, length, tone, purpose, language: 'en', model: 'basic' });
+  const res = await fetch(`${DECOPY_API}/api/decopy/ai-humanizer/create-job`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Product-Serial': getDeviceSerial(),
+      'Authorization': '',
+      'Origin': 'https://decopy.ai',
+      'Referer': 'https://decopy.ai/ai-humanizer/',
+    },
+    body: params,
+  });
+  const data = await res.json();
+  if (data.code !== 100000) throw new Error('DAILY_LIMIT_REACHED: Decopy.ai requires login for humanization.');
+  const jobId = data.result.job_id;
+  
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const pollRes = await fetch(`${DECOPY_API}/api/decopy/ai-humanizer/get-job/${jobId}`, {
+      headers: { 'Product-Serial': getDeviceSerial(), 'Authorization': '', 'Origin': 'https://decopy.ai' },
+    });
+    const pollData = await pollRes.json();
+    if (pollData.code === 100000 && pollData.result?.output) {
+      return pollData.result.output;
+    }
+  }
+  throw new Error('Humanization timed out');
+};
+
 // -- Utils --
 const getWordCount = (text) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
 
@@ -534,6 +609,294 @@ Rules:
   );
 };
 
+const AdvancedPage = ({ currentUser, config }) => {
+  const [activeTab, setActiveTab] = useState('detect');
+  // Detect state
+  const [detectText, setDetectText] = useState('');
+  const [detectLoading, setDetectLoading] = useState(false);
+  const [detectResult, setDetectResult] = useState(null);
+  const [detectError, setDetectError] = useState('');
+  const [detectProgress, setDetectProgress] = useState('');
+  // Humanize state
+  const [humanizeText, setHumanizeText] = useState('');
+  const [humanizeResult, setHumanizeResult] = useState('');
+  const [humanizeLoading, setHumanizeLoading] = useState(false);
+  const [humanizeError, setHumanizeError] = useState('');
+  const [humanizeProgress, setHumanizeProgress] = useState('');
+  const [tone, setTone] = useState('normal');
+  const [purpose, setPurpose] = useState('general_writing');
+  const [length, setLength] = useState('standard');
+  const [copied, setCopied] = useState(false);
+
+  const runDetect = async () => {
+    if (!detectText.trim()) return setDetectError('Please enter text to detect.');
+    setDetectLoading(true); setDetectResult(null); setDetectError('');
+    setDetectProgress('🔍 Sending to decopy.ai...');
+    try {
+      setDetectProgress('⏳ Analyzing with decopy.ai ML model...');
+      const output = await decopyDetect(detectText);
+      setDetectResult(output);
+      setDetectProgress('');
+    } catch (e) {
+      setDetectError(e.message);
+      setDetectProgress('');
+    }
+    setDetectLoading(false);
+  };
+
+  const runHumanize = async () => {
+    if (!humanizeText.trim()) return setHumanizeError('Please enter text.');
+    setHumanizeLoading(true); setHumanizeResult(''); setHumanizeError('');
+    setHumanizeProgress('📡 Sending to decopy.ai humanizer...');
+    try {
+      setHumanizeProgress('⏳ Humanizing... (may take up to 30s)');
+      const output = await decopyHumanize(humanizeText, { length, tone, purpose });
+      // output can be string or object with text field
+      const resultText = typeof output === 'string' ? output : (output?.text || output?.result || JSON.stringify(output));
+      setHumanizeResult(resultText);
+      setHumanizeProgress('');
+    } catch (e) {
+      setHumanizeError(e.message);
+      setHumanizeProgress('');
+    }
+    setHumanizeLoading(false);
+  };
+
+  const aiScore = detectResult ? Math.round((detectResult.score || 0) * 100) : 0;
+  const scoreColor = aiScore > 70 ? '#ff3366' : aiScore > 40 ? '#ffaa00' : '#00ff88';
+
+  return (
+    <div className="flex flex-col gap-4 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl md:text-2xl orbitron text-[#00ff88]">Advanced Mode</span>
+          <span className="text-[10px] courier text-gray-500 border border-[#333] rounded px-2 py-0.5 uppercase">Powered by decopy.ai</span>
+        </div>
+      </div>
+
+      {/* Tab Switch */}
+      <div className="flex gap-2 p-1 bg-[#111] rounded-lg border border-[#222] w-fit">
+        <button
+          onClick={() => setActiveTab('detect')}
+          className={`px-4 py-2 rounded text-xs orbitron uppercase tracking-widest transition-all ${
+            activeTab === 'detect'
+              ? 'bg-[#00ff88] text-black font-bold shadow-[0_0_15px_rgba(0,255,136,0.4)]'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          AI Detector
+        </button>
+        <button
+          onClick={() => setActiveTab('humanize')}
+          className={`px-4 py-2 rounded text-xs orbitron uppercase tracking-widest transition-all ${
+            activeTab === 'humanize'
+              ? 'bg-[#00ff88] text-black font-bold shadow-[0_0_15px_rgba(0,255,136,0.4)]'
+              : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          Humanizer
+        </button>
+      </div>
+
+      {/* ---- DETECT TAB ---- */}
+      {activeTab === 'detect' && (
+        <div className="flex flex-col gap-4">
+          <div className="glass p-4 md:p-6 rounded-lg flex flex-col gap-4 scan-container border border-[#00ff88]/10">
+            {detectLoading && <div className="scan-line"></div>}
+            <div className="flex justify-between items-center">
+              <span className="orbitron text-xs text-gray-400 uppercase tracking-widest">Input Text</span>
+              <span className="text-[10px] courier text-gray-500">{getWordCount(detectText)} words</span>
+            </div>
+            <textarea
+              value={detectText}
+              onChange={e => setDetectText(e.target.value)}
+              placeholder="Paste your text here — decopy.ai will scan it with their ML model..."
+              className="w-full h-48 bg-[#0a0a0f] border border-[#222] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white text-sm"
+            />
+            {detectError && <div className="text-[#ff3366] text-xs courier">{'>'} ERROR: {detectError}</div>}
+            {detectProgress && <div className="text-[#00ff88] text-xs courier typewriter">{detectProgress}</div>}
+            <button
+              onClick={runDetect}
+              disabled={detectLoading}
+              className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50 orbitron uppercase text-xs tracking-widest"
+            >
+              {detectLoading ? <span className="typewriter">Analyzing...</span> : 'Scan with Decopy.ai'}
+            </button>
+          </div>
+
+          {detectResult && (
+            <div className="animated-border p-[1px] rounded-lg">
+              <div className="glass p-4 md:p-6 rounded-lg flex flex-col gap-6">
+                {/* Score overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col items-center justify-center gap-2 py-4 border border-[#222] rounded-lg bg-[#0a0a0f]">
+                    <div className="text-5xl font-bold orbitron" style={{ color: scoreColor, textShadow: `0 0 20px ${scoreColor}` }}>
+                      {aiScore}%
+                    </div>
+                    <div className="text-[10px] courier text-gray-500 uppercase tracking-widest">AI Score</div>
+                    <div className={`text-xs font-bold px-3 py-1 rounded mt-1 ${
+                      aiScore > 70 ? 'bg-[#ff3366]/20 text-[#ff3366]' :
+                      aiScore > 40 ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-[#00ff88]/20 text-[#00ff88]'
+                    }`}>
+                      {aiScore > 70 ? 'Likely AI-Generated' : aiScore > 40 ? 'Mixed Content' : 'Likely Human'}
+                    </div>
+                  </div>
+                  <div className="md:col-span-2 flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-xs courier mb-1">
+                      <span className="text-gray-400">Human</span>
+                      <span className="text-gray-400">AI</span>
+                    </div>
+                    <div className="h-4 rounded-full bg-[#111] border border-[#222] overflow-hidden">
+                      <div
+                        className="h-full transition-all duration-1000 ease-out"
+                        style={{
+                          width: `${aiScore}%`,
+                          background: `linear-gradient(90deg, ${scoreColor}80, ${scoreColor})`,
+                          boxShadow: `0 0 12px ${scoreColor}`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] courier text-gray-500 mt-1">
+                      <span>{100 - aiScore}% Human</span>
+                      <span>{aiScore}% AI</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-[#111] rounded p-3 border border-[#222]">
+                        <div className="text-gray-500 courier text-[10px] uppercase mb-1">Language</div>
+                        <div className="text-white font-mono">{(detectResult.language || 'en').toUpperCase()}</div>
+                      </div>
+                      <div className="bg-[#111] rounded p-3 border border-[#222]">
+                        <div className="text-gray-500 courier text-[10px] uppercase mb-1">Sentences</div>
+                        <div className="text-white font-mono">{detectResult.success_count || detectResult.sentences?.length || 0}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sentence-level analysis */}
+                {detectResult.sentences?.length > 0 && (
+                  <div>
+                    <h3 className="orbitron text-xs text-gray-300 uppercase tracking-widest mb-3">Sentence Analysis</h3>
+                    <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                      {detectResult.sentences.map((s, i) => {
+                        const pct = Math.round((s.score || 0) * 100);
+                        const c = pct > 70 ? '#ff3366' : pct > 40 ? '#ffaa00' : '#00ff88';
+                        return (
+                          <div key={i} className="bg-[#0a0a0f] border border-[#1a1a1a] rounded p-3 flex items-start gap-3">
+                            <div className="shrink-0 w-8 h-8 rounded flex items-center justify-center text-[10px] font-bold" style={{ background: `${c}20`, color: c }}>
+                              {pct}%
+                            </div>
+                            <span className="text-gray-300 text-xs leading-relaxed">{s.content}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---- HUMANIZE TAB ---- */}
+      {activeTab === 'humanize' && (
+        <div className="flex flex-col gap-4">
+          {/* Options row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] courier text-gray-500 uppercase mb-1 block">Length</label>
+              <select value={length} onChange={e => setLength(e.target.value)} className="w-full bg-[#111] border border-[#333] rounded p-2 text-white text-xs focus:outline-none focus:border-[#00ff88]">
+                <option value="shorten">Shorten</option>
+                <option value="standard">Standard</option>
+                <option value="expand">Expand</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] courier text-gray-500 uppercase mb-1 block">Tone</label>
+              <select value={tone} onChange={e => setTone(e.target.value)} className="w-full bg-[#111] border border-[#333] rounded p-2 text-white text-xs focus:outline-none focus:border-[#00ff88]">
+                <option value="normal">Normal</option>
+                <option value="professional">Professional</option>
+                <option value="academic">Academic</option>
+                <option value="formal">Formal</option>
+                <option value="business">Business</option>
+                <option value="creative">Creative</option>
+                <option value="friendly">Friendly</option>
+                <option value="colloquial">Colloquial</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] courier text-gray-500 uppercase mb-1 block">Purpose</label>
+              <select value={purpose} onChange={e => setPurpose(e.target.value)} className="w-full bg-[#111] border border-[#333] rounded p-2 text-white text-xs focus:outline-none focus:border-[#00ff88]">
+                <option value="general_writing">General Writing</option>
+                <option value="academic">Academic</option>
+                <option value="essay">Essay</option>
+                <option value="blog">Blog</option>
+                <option value="marketing_material">Marketing</option>
+                <option value="story">Story</option>
+                <option value="report">Report</option>
+                <option value="business_material">Business</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Input */}
+            <div className="glass p-4 rounded-lg flex flex-col gap-3 scan-container border border-[#00ff88]/10">
+              {humanizeLoading && <div className="scan-line"></div>}
+              <div className="flex justify-between items-center">
+                <span className="orbitron text-xs text-gray-400 uppercase tracking-widest">AI Text Input</span>
+                <span className="text-[10px] courier text-gray-500">{getWordCount(humanizeText)}w</span>
+              </div>
+              <textarea
+                value={humanizeText}
+                onChange={e => setHumanizeText(e.target.value)}
+                placeholder="Paste AI-generated text here — decopy.ai will rewrite it to sound human..."
+                className="flex-1 h-48 bg-[#0a0a0f] border border-[#222] rounded p-4 focus:outline-none focus:border-[#00ff88] resize-none text-white text-sm courier"
+              />
+              {humanizeError && <div className="text-[#ff3366] text-[10px] courier">{'>'} ERROR: {humanizeError}</div>}
+              {humanizeProgress && <div className="text-[#00ff88] text-[10px] courier typewriter">{humanizeProgress}</div>}
+              <button
+                onClick={runHumanize}
+                disabled={humanizeLoading}
+                className="bg-[#00ff88] text-black font-bold py-3 rounded hover:bg-[#00cc6a] transition disabled:opacity-50 orbitron uppercase text-xs tracking-widest"
+              >
+                {humanizeLoading ? <span className="typewriter">Humanizing...</span> : 'Humanize via Decopy.ai'}
+              </button>
+            </div>
+
+            {/* Output */}
+            <div className="animated-border p-[1px] flex flex-col">
+              <div className="glass p-4 rounded-lg flex flex-col gap-3 h-full">
+                <div className="flex justify-between items-center">
+                  <span className="orbitron text-xs text-[#00ff88] uppercase tracking-widest">Humanized Output</span>
+                  {humanizeResult && <span className="text-[10px] text-gray-500 courier">{getWordCount(humanizeResult)}w</span>}
+                </div>
+                <div className="flex-1 h-48 bg-[#0a0a0f] border border-[#222] rounded p-4 overflow-y-auto whitespace-pre-wrap text-gray-200 text-sm courier">
+                  {humanizeResult
+                    ? humanizeResult
+                    : <span className="text-gray-700 italic">Humanized text will appear here...</span>
+                  }
+                </div>
+                {humanizeResult && (
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(humanizeResult); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                    className="flex items-center justify-center gap-2 border border-[#333] hover:border-[#00ff88] text-gray-300 py-2 rounded transition text-[10px] uppercase orbitron tracking-wider"
+                  >
+                    {copied ? <><Check size={12} /> COPIED!</> : <><Copy size={12} /> COPY OUTPUT</>}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const HistoryPage = ({ currentUser }) => {
   const [history, setHistory] = useState([]);
 
@@ -881,6 +1244,7 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser, isOpen, setIsOpen
   const navItems = [
     { id: 'detect', label: 'AI Detection', icon: <Shield size={18} /> },
     { id: 'humanize', label: 'Humanizer', icon: <Wand2 size={18} /> },
+    { id: 'advanced', label: 'Advanced', icon: <span className="text-[10px] font-black orbitron">PRO</span>, badge: true },
     { id: 'history', label: 'History', icon: <HistoryIcon size={18} /> },
   ];
 
@@ -912,12 +1276,22 @@ const Sidebar = ({ page, setPage, currentUser, setCurrentUser, isOpen, setIsOpen
         </div>
         <div className="flex-1 px-4 flex flex-col gap-2 mt-4">
           {navItems.map(item => (
-            <button 
-              key={item.id} 
+            <button
+              key={item.id}
               onClick={() => { setPage(item.id); setIsOpen(false); }}
-              className={`flex items-center gap-3 p-3 rounded transition-all ${page === item.id ? 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30' : 'text-gray-400 hover:bg-[#111] hover:text-white'}`}
+              className={`flex items-center gap-3 p-3 rounded transition-all ${
+                page === item.id
+                  ? item.badge
+                    ? 'bg-[#ff3366]/10 text-[#ff3366] border border-[#ff3366]/30'
+                    : 'bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30'
+                  : 'text-gray-400 hover:bg-[#111] hover:text-white'
+              }`}
             >
-              {item.icon} {item.label}
+              <span className={item.badge && page !== item.id ? 'text-[#ff3366]' : ''}>{item.icon}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.badge && page !== item.id && (
+                <span className="text-[8px] orbitron bg-[#ff3366]/20 text-[#ff3366] border border-[#ff3366]/30 px-1.5 py-0.5 rounded uppercase">New</span>
+              )}
             </button>
           ))}
         </div>
@@ -1029,6 +1403,7 @@ export default function App() {
             {page === 'detect' && <DetectPage currentUser={currentUser} config={config} onHumanizeRequest={handleHumanizeRequest} initialText={page==='detect' ? transferText : ''} />}
             {page === 'humanize' && <HumanizePage currentUser={currentUser} config={config} initialText={page==='humanize' ? transferText : ''} onDetectRequest={handleDetectRequest} />}
             {page === 'history' && <HistoryPage currentUser={currentUser} />}
+            {page === 'advanced' && <AdvancedPage currentUser={currentUser} config={config} />}
             {page === 'admin' && currentUser?.role === 'admin' && <AdminPage />}
             {page === 'settings' && <SettingsPage config={config} setConfig={setConfig} isAdmin={currentUser?.role === 'admin'} currentUser={currentUser} setCurrentUser={setCurrentUser} />}
           </div>
