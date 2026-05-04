@@ -32,7 +32,7 @@ const decopyDetect = async (text) => {
     body,
   });
   const data = await res.json();
-  if (data.code !== 100000) throw new Error(data.message?.en || 'Detection failed');
+  if (data.code !== 100000) throw new Error("DECOPY_QUOTA_EXCEEDED: Decopy.ai has limited guest scans. Try again later or use Standard Mode.");
   const jobId = data.result.job_id;
   
   for (let i = 0; i < 20; i++) {
@@ -241,7 +241,7 @@ const AuthPage = ({ setPage, setCurrentUser, isLogin }) => {
     try {
       if (isLogin) {
         const userObj = await window.storage.get(`users:${email}`);
-        if (!userObj) throw new Error("ID_NOT_FOUND");
+        if (!userObj) throw new Error("ID_NOT_FOUND: Accounts are browser-specific. Please Signup on this browser.");
         if (userObj.value.password !== password) throw new Error("AUTH_KEY_INVALID");
         if (userObj.value.status === 'pending') throw new Error("PENDING_ADMIN_LINK");
         if (userObj.value.status === 'blocked') throw new Error("ACCOUNT_LOCKED_BY_ADMIN");
